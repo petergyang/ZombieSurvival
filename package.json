@@ -1,0 +1,11 @@
+{
+  "name": "zombie-survival",
+  "version": "1.0.0",
+  "description": "A simple zombie survival game",
+  "scripts": {
+    "start": "http-server -p 8000 --mime-types '{\"application/javascript\": [\"js\"], \"text/html\": [\"html\"]}'"
+  },
+  "dependencies": {
+    "http-server": "^14.1.1"
+  }
+} 
