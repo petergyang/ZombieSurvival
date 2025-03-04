@@ -1,92 +1,43 @@
 # Zombie Survival Game
 
-A first-person zombie survival game built with Three.js. Survive against waves of zombies in this simple but intense shooting experience.
+A 3D first-person zombie survival game built with Three.js. Fight off waves of zombies and survive as long as possible!
 
-## Game Overview
+## Play the Game
 
-### Core Features
-- First-person perspective
-- Simple shooting mechanics
-- Basic zombie AI
-- Health system
-- Wave-based zombie spawning
+You can play the game online at: [https://petergyang.github.io/ZombieSurvival/](https://petergyang.github.io/ZombieSurvival/)
 
-### Gameplay Elements
+## Game Features
 
-#### Player Mechanics
-- WASD movement controls
-- Mouse look for camera control
-- Hold SPACE to shoot
-- Health system (100 HP)
-- Simple crosshair for aiming
+- First-person shooter gameplay
+- Wave-based zombie spawning system
+- Boss zombie on the final wave
+- Health system and damage indicators
+- Atmospheric fog effects
+- Zombie health bars
 
-#### Zombie Type
-- Basic Zombie
-  - Follows player
-  - Moderate health
-  - Deals damage on contact
-  - Spawns in waves
-  - Simple pathfinding
+## Controls
 
-### Game Loop
-1. Player starts with full health
-2. Zombies spawn in waves
-3. Player must shoot zombies to survive
-4. Game ends when player's health reaches 0
+- **Mouse Movement**: Look around
+- **W, A, S, D**: Move
+- **Left Mouse Button**: Shoot
+- **ESC**: Unlock mouse pointer
 
-## Technical Stack
+## Development
+
+This game is built using:
 - Three.js for 3D rendering
 - JavaScript for game logic
-- HTML5 Canvas for UI elements
-- Basic 3D models for player and zombies
+- HTML5 and CSS for the UI
 
-## Development Phases
+## Local Development
 
-### Phase 1: Basic Environment and Player Movement
-- Set up Three.js project structure
-- Create basic 3D environment (ground, sky)
-- Implement first-person camera
-- Add WASD movement controls
-- Add mouse look controls
-- Test basic movement and camera controls
+To run the game locally:
 
-### Phase 2: Shooting Mechanics
-- Implement basic gun model
-- Add shooting animation
-- Create bullet system
-- Add crosshair UI
-- Implement bullet collision detection
-- Test shooting mechanics
+1. Clone the repository
+2. Navigate to the project directory
+3. Run a local server (e.g., `npx http-server`)
+4. Open your browser to the local server address (typically http://localhost:8000)
 
-### Phase 3: Basic Zombie Implementation
-- Create basic zombie model
-- Implement zombie spawning system
-- Add simple zombie movement
-- Create basic zombie-player collision
-- Test zombie behavior
+## License
 
-### Phase 4: Zombie AI and Combat
-- Implement zombie pathfinding
-- Add zombie health system
-- Create damage system
-- Add wave-based spawning
-- Test combat mechanics
-
-### Phase 5: Polish and UI
-- Add health system UI
-- Implement game over state
-- Add score system
-- Create basic menu system
-- Final testing and bug fixes
-
-## Development Focus
-Each phase will be developed and tested independently to ensure stability before moving to the next phase. This phased approach allows for:
-1. Easier debugging and testing
-2. Clear progress tracking
-3. Manageable code complexity
-4. Stable foundation for each feature
-5. Better quality control
-
-This phased development plan ensures a systematic approach to building the game, with each phase building upon the previous one's foundation.
-
-This simplified specification focuses on core shooting mechanics and zombie survival, making it perfect for a Three.js-based web game. 
+MIT 
