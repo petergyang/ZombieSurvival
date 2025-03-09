@@ -504,8 +504,241 @@ function createHouse(x, z) {
     window2.position.set(2, 0, 5);
     house.add(window2);
     
+    // Add windows to the sides
+    const sideWindow1 = window1.clone();
+    sideWindow1.position.set(4, 0, 0);
+    sideWindow1.rotation.y = Math.PI / 2;
+    house.add(sideWindow1);
+    
+    const sideWindow2 = window1.clone();
+    sideWindow2.position.set(-4, 0, 0);
+    sideWindow2.rotation.y = Math.PI / 2;
+    house.add(sideWindow2);
+    
     house.position.set(x, 3, z);
     return house;
+}
+
+// Function to create a cottage (smaller house variant)
+function createCottage(x, z) {
+    const cottage = new THREE.Group();
+    
+    // Main cottage body
+    const wallsGeometry = new THREE.BoxGeometry(6, 4, 7);
+    const wallsMaterial = new THREE.MeshStandardMaterial({ color: 0xc8a887 });
+    const walls = new THREE.Mesh(wallsGeometry, wallsMaterial);
+    walls.castShadow = true;
+    walls.receiveShadow = true;
+    cottage.add(walls);
+    
+    // Roof
+    const roofGeometry = new THREE.ConeGeometry(5, 3, 4);
+    const roofMaterial = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
+    const roof = new THREE.Mesh(roofGeometry, roofMaterial);
+    roof.position.y = 3.5;
+    roof.rotation.y = Math.PI / 4;
+    roof.castShadow = true;
+    roof.receiveShadow = true;
+    cottage.add(roof);
+    
+    // Door
+    const doorGeometry = new THREE.BoxGeometry(1.2, 2.5, 0.2);
+    const doorMaterial = new THREE.MeshStandardMaterial({ color: 0x4a2f1b });
+    const door = new THREE.Mesh(doorGeometry, doorMaterial);
+    door.position.set(0, -0.75, 3.5);
+    cottage.add(door);
+    
+    // Windows
+    const windowGeometry = new THREE.BoxGeometry(1.2, 1.2, 0.2);
+    const windowMaterial = new THREE.MeshStandardMaterial({ color: 0x88c1ff });
+    
+    const window1 = new THREE.Mesh(windowGeometry, windowMaterial);
+    window1.position.set(-1.5, 0, 3.5);
+    cottage.add(window1);
+    
+    const window2 = new THREE.Mesh(windowGeometry, windowMaterial);
+    window2.position.set(1.5, 0, 3.5);
+    cottage.add(window2);
+    
+    cottage.position.set(x, 2, z);
+    return cottage;
+}
+
+// Function to create a barn
+function createBarn(x, z) {
+    const barn = new THREE.Group();
+    
+    // Main barn body
+    const wallsGeometry = new THREE.BoxGeometry(10, 8, 12);
+    const wallsMaterial = new THREE.MeshStandardMaterial({ color: 0xa52a2a });
+    const walls = new THREE.Mesh(wallsGeometry, wallsMaterial);
+    walls.castShadow = true;
+    walls.receiveShadow = true;
+    barn.add(walls);
+    
+    // Roof
+    const roofGeometry = new THREE.ConeGeometry(8, 5, 4);
+    const roofMaterial = new THREE.MeshStandardMaterial({ color: 0x654321 });
+    const roof = new THREE.Mesh(roofGeometry, roofMaterial);
+    roof.position.y = 6.5;
+    roof.rotation.y = Math.PI / 4;
+    roof.castShadow = true;
+    roof.receiveShadow = true;
+    barn.add(roof);
+    
+    // Door
+    const doorGeometry = new THREE.BoxGeometry(4, 6, 0.2);
+    const doorMaterial = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
+    const door = new THREE.Mesh(doorGeometry, doorMaterial);
+    door.position.set(0, -1, 6);
+    barn.add(door);
+    
+    barn.position.set(x, 4, z);
+    return barn;
+}
+
+// Function to create a well
+function createWell(x, z) {
+    const well = new THREE.Group();
+    
+    // Well base
+    const baseGeometry = new THREE.CylinderGeometry(2, 2, 1, 16);
+    const baseMaterial = new THREE.MeshStandardMaterial({ color: 0x808080 });
+    const base = new THREE.Mesh(baseGeometry, baseMaterial);
+    base.position.y = 0.5;
+    base.castShadow = true;
+    base.receiveShadow = true;
+    well.add(base);
+    
+    // Well wall
+    const wallGeometry = new THREE.CylinderGeometry(1.5, 1.5, 2, 16);
+    const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x808080 });
+    const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+    wall.position.y = 2;
+    wall.castShadow = true;
+    wall.receiveShadow = true;
+    well.add(wall);
+    
+    // Well roof supports
+    const supportGeometry = new THREE.BoxGeometry(0.3, 3, 0.3);
+    const supportMaterial = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
+    
+    const support1 = new THREE.Mesh(supportGeometry, supportMaterial);
+    support1.position.set(1.5, 2.5, 0);
+    well.add(support1);
+    
+    const support2 = new THREE.Mesh(supportGeometry, supportMaterial);
+    support2.position.set(-1.5, 2.5, 0);
+    well.add(support2);
+    
+    // Well roof
+    const roofGeometry = new THREE.ConeGeometry(2.5, 1.5, 4);
+    const roofMaterial = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
+    const roof = new THREE.Mesh(roofGeometry, roofMaterial);
+    roof.position.y = 4.5;
+    roof.rotation.y = Math.PI / 4;
+    roof.castShadow = true;
+    roof.receiveShadow = true;
+    well.add(roof);
+    
+    well.position.set(x, 0, z);
+    return well;
+}
+
+// Function to create a fence section
+function createFenceSection(x, z, rotation) {
+    const fence = new THREE.Group();
+    
+    // Posts
+    const postGeometry = new THREE.BoxGeometry(0.3, 2, 0.3);
+    const postMaterial = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
+    
+    const post1 = new THREE.Mesh(postGeometry, postMaterial);
+    post1.position.set(-1, 1, 0);
+    post1.castShadow = true;
+    post1.receiveShadow = true;
+    fence.add(post1);
+    
+    const post2 = new THREE.Mesh(postGeometry, postMaterial);
+    post2.position.set(1, 1, 0);
+    post2.castShadow = true;
+    post2.receiveShadow = true;
+    fence.add(post2);
+    
+    // Rails
+    const railGeometry = new THREE.BoxGeometry(2.3, 0.2, 0.1);
+    const railMaterial = new THREE.MeshStandardMaterial({ color: 0xa0522d });
+    
+    const rail1 = new THREE.Mesh(railGeometry, railMaterial);
+    rail1.position.set(0, 0.5, 0);
+    rail1.castShadow = true;
+    rail1.receiveShadow = true;
+    fence.add(rail1);
+    
+    const rail2 = new THREE.Mesh(railGeometry, railMaterial);
+    rail2.position.set(0, 1.5, 0);
+    rail2.castShadow = true;
+    rail2.receiveShadow = true;
+    fence.add(rail2);
+    
+    fence.position.set(x, 0, z);
+    fence.rotation.y = rotation;
+    return fence;
+}
+
+// Function to create a path section
+function createPathSection(x, z, width, length, rotation) {
+    const path = new THREE.Group();
+    
+    // Path surface
+    const pathGeometry = new THREE.PlaneGeometry(width, length);
+    const pathMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0xd2b48c,
+        roughness: 1.0,
+        side: THREE.DoubleSide
+    });
+    const pathSurface = new THREE.Mesh(pathGeometry, pathMaterial);
+    pathSurface.rotation.x = -Math.PI / 2;
+    pathSurface.position.y = 0.05; // Slightly above ground to prevent z-fighting
+    pathSurface.receiveShadow = true;
+    path.add(pathSurface);
+    
+    path.position.set(x, 0, z);
+    path.rotation.y = rotation;
+    return path;
+}
+
+// Function to create a farm plot
+function createFarmPlot(x, z, width, length) {
+    const farm = new THREE.Group();
+    
+    // Soil
+    const soilGeometry = new THREE.BoxGeometry(width, 0.2, length);
+    const soilMaterial = new THREE.MeshStandardMaterial({ color: 0x5c4033 });
+    const soil = new THREE.Mesh(soilGeometry, soilMaterial);
+    soil.position.y = 0.1;
+    soil.receiveShadow = true;
+    farm.add(soil);
+    
+    // Crops (simple green blocks)
+    const cropGeometry = new THREE.BoxGeometry(0.3, 0.5, 0.3);
+    const cropMaterial = new THREE.MeshStandardMaterial({ color: 0x228b22 });
+    
+    // Add crops in rows
+    for (let i = -width/2 + 1; i < width/2; i += 1) {
+        for (let j = -length/2 + 1; j < length/2; j += 1) {
+            if (Math.random() > 0.3) { // Random gaps
+                const crop = new THREE.Mesh(cropGeometry, cropMaterial);
+                crop.position.set(i, 0.4, j);
+                crop.castShadow = true;
+                crop.receiveShadow = true;
+                farm.add(crop);
+            }
+        }
+    }
+    
+    farm.position.set(x, 0, z);
+    return farm;
 }
 
 // Function to create a decorative building
@@ -572,6 +805,95 @@ const buildings = [
 ];
 
 buildings.forEach(building => scene.add(building));
+
+// Clear existing scene elements
+// Remove existing trees and buildings
+trees.forEach(tree => scene.remove(tree));
+trees.length = 0;
+buildings.forEach(building => scene.remove(building));
+buildings.length = 0;
+scene.remove(mainHouse);
+
+// Create village layout
+// Central village square
+const villageCenter = createWell(0, 0);
+scene.add(villageCenter);
+
+// Main path through village
+const mainPath = createPathSection(0, 0, 6, 60, 0);
+scene.add(mainPath);
+const crossPath = createPathSection(0, 0, 6, 60, Math.PI/2);
+scene.add(crossPath);
+
+// Houses around the village
+const houses = [
+    createHouse(-15, -12),
+    createHouse(15, -15),
+    createHouse(-18, 15),
+    createHouse(20, 12),
+    createCottage(-10, 8),
+    createCottage(12, -5),
+    createCottage(-8, -20),
+    createCottage(8, 20)
+];
+houses.forEach(house => scene.add(house));
+
+// Add a barn
+const barn = createBarn(-25, -25);
+scene.add(barn);
+
+// Farm plots
+const farms = [
+    createFarmPlot(-25, 0, 10, 15),
+    createFarmPlot(25, 0, 10, 15)
+];
+farms.forEach(farm => scene.add(farm));
+
+// Add fences around farms
+for (let i = 0; i < 5; i++) {
+    const fence1 = createFenceSection(-30 + i*2.3, -8, 0);
+    scene.add(fence1);
+    const fence2 = createFenceSection(-30 + i*2.3, 8, 0);
+    scene.add(fence2);
+    const fence3 = createFenceSection(20 + i*2.3, -8, 0);
+    scene.add(fence3);
+    const fence4 = createFenceSection(20 + i*2.3, 8, 0);
+    scene.add(fence4);
+}
+
+for (let i = 0; i < 4; i++) {
+    const fence1 = createFenceSection(-30, -6 + i*2.3, Math.PI/2);
+    scene.add(fence1);
+    const fence2 = createFenceSection(-20, -6 + i*2.3, Math.PI/2);
+    scene.add(fence2);
+    const fence3 = createFenceSection(30, -6 + i*2.3, Math.PI/2);
+    scene.add(fence3);
+    const fence4 = createFenceSection(20, -6 + i*2.3, Math.PI/2);
+    scene.add(fence4);
+}
+
+// Add trees around the village (fewer trees, more spread out)
+for (let i = 0; i < 20; i++) {
+    const angle = (i / 20) * Math.PI * 2;
+    const radius = 40 + Math.random() * 15;
+    const x = Math.cos(angle) * radius;
+    const z = Math.sin(angle) * radius;
+    const tree = createTree(x, z);
+    trees.push(tree);
+    scene.add(tree);
+}
+
+// Add some random trees within the village
+for (let i = 0; i < 8; i++) {
+    const x = (Math.random() - 0.5) * 50;
+    const z = (Math.random() - 0.5) * 50;
+    // Don't place trees too close to the center
+    if (Math.sqrt(x*x + z*z) > 8) {
+        const tree = createTree(x, z);
+        trees.push(tree);
+        scene.add(tree);
+    }
+}
 
 // Event Listeners for movement
 document.addEventListener('keydown', (event) => {
