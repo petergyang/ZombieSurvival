@@ -50,7 +50,8 @@ const keys = {
     a: false,
     s: false,
     d: false,
-    z: false // Add Z key for wave skipping
+    z: false, // Add Z key for wave skipping
+    p: false // Add P key for pausing
 };
 let isPointerLocked = false;
 
@@ -88,6 +89,9 @@ const waveSystem = {
 const bloodParticles = [];
 const bloodGeometry = new THREE.SphereGeometry(0.05, 8, 8);
 const bloodMaterial = new THREE.MeshBasicMaterial({ color: 0xcc0000 });
+
+// Add game state variable for pause
+let isPaused = false;
 
 // Create weapon models
 function createPistol() {
@@ -572,6 +576,7 @@ buildings.forEach(building => scene.add(building));
 // Event Listeners for movement
 document.addEventListener('keydown', (event) => {
     const key = event.key.toLowerCase();
+    // Handle all keys in one place
     if (keys.hasOwnProperty(key)) {
         keys[key] = true;
     }
@@ -847,11 +852,13 @@ function createZombie(x, z, isBoss = false) {
     const scale = isBoss ? 10 : 1; // Increased from 2.5 to 10 for boss
     const color = isBoss ? 0x8B0000 : 0x2d9d2d; // Dark red for boss, green for regular
     
-    // Zombie body
+    // Zombie body - slightly hunched forward
     const bodyGeometry = new THREE.CylinderGeometry(0.5 * scale, 0.3 * scale, 1.8 * scale, 8);
     const bodyMaterial = new THREE.MeshStandardMaterial({ color: color });
     const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
     body.position.y = 0.9 * scale;
+    // Add a forward hunch to the body
+    body.rotation.x = 0.2;
     body.castShadow = true;
     zombie.add(body);
     
@@ -859,41 +866,49 @@ function createZombie(x, z, isBoss = false) {
     const headGeometry = new THREE.SphereGeometry(0.4 * scale, 8, 8);
     const headMaterial = new THREE.MeshStandardMaterial({ color: color });
     const head = new THREE.Mesh(headGeometry, headMaterial);
+    // Adjust head position to match the hunched body
     head.position.y = 2.1 * scale;
+    head.position.z = -0.2 * scale; // Move head forward slightly to match hunched posture
     head.castShadow = true;
     zombie.add(head);
     
-    // Zombie arms
-    const armGeometry = new THREE.CylinderGeometry(0.15 * scale, 0.15 * scale, 1.2 * scale, 8);
+    // Zombie arms - slightly longer and more dangling
+    const armGeometry = new THREE.CylinderGeometry(0.15 * scale, 0.15 * scale, 1.3 * scale, 8);
     const armMaterial = new THREE.MeshStandardMaterial({ color: color });
     
     const leftArm = new THREE.Mesh(armGeometry, armMaterial);
     leftArm.position.set(-0.7 * scale, 0.9 * scale, 0);
     leftArm.rotation.z = Math.PI / 4; // Angle arm outward
+    leftArm.rotation.x = 0.3; // Angle arm forward slightly
     leftArm.castShadow = true;
     zombie.add(leftArm);
     
     const rightArm = new THREE.Mesh(armGeometry, armMaterial);
     rightArm.position.set(0.7 * scale, 0.9 * scale, 0);
     rightArm.rotation.z = -Math.PI / 4; // Angle arm outward
+    rightArm.rotation.x = 0.3; // Angle arm forward slightly
     rightArm.castShadow = true;
     zombie.add(rightArm);
     
-    // Zombie legs
-    const legGeometry = new THREE.CylinderGeometry(0.2 * scale, 0.2 * scale, 1.5 * scale, 8);
+    // Zombie legs - positioned wider apart for shambling stance
+    const legGeometry = new THREE.CylinderGeometry(0.2 * scale, 0.2 * scale, 1.2 * scale, 8); // Shortened from 1.5 to 1.2
     const legMaterial = new THREE.MeshStandardMaterial({ color: color });
     
     const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
-    leftLeg.position.set(-0.3 * scale, -0.75 * scale, 0);
+    leftLeg.position.set(-0.4 * scale, -0.6 * scale, 0); // Raised from -0.75 to -0.6
+    // Angle leg slightly outward
+    leftLeg.rotation.z = 0.1;
     leftLeg.castShadow = true;
     zombie.add(leftLeg);
     
     const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
-    rightLeg.position.set(0.3 * scale, -0.75 * scale, 0);
+    rightLeg.position.set(0.4 * scale, -0.6 * scale, 0); // Raised from -0.75 to -0.6
+    // Angle leg slightly outward
+    rightLeg.rotation.z = -0.1;
     rightLeg.castShadow = true;
     zombie.add(rightLeg);
     
-    // Zombie eyes (red)
+    // Zombie eyes (red) - keeping these the same as they're already good
     const eyeGeometry = new THREE.SphereGeometry(0.1 * scale, 8, 8);
     const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
     
@@ -905,8 +920,8 @@ function createZombie(x, z, isBoss = false) {
     rightEye.position.set(0.2 * scale, 2.2 * scale, 0.3 * scale);
     zombie.add(rightEye);
     
-    // Set zombie position
-    zombie.position.set(x, 0, z);
+    // Set zombie position - raise the zombie so legs are visible
+    zombie.position.set(x, 1.5, z); // Raised from 0.75 to 1.5 to make legs more visible
     
     // Add zombie data
     zombie.userData = {
@@ -1164,6 +1179,17 @@ function updateZombies() {
             player.position.z
         ));
         
+        // Add bobbing motion to make zombies more zombie-like
+        if (zombie.userData.isWalking) {
+            const walkCycle = Math.sin((now * 0.005) + zombie.userData.walkOffset);
+            const bobHeight = walkCycle * 0.2; // More pronounced bobbing
+            const baseHeight = zombie.userData.isBoss ? 4.0 : 1.0; // Lowered from 5.0/1.5 to 4.0/1.0
+            zombie.position.y = baseHeight + Math.abs(bobHeight);
+            
+            // Tilt side to side slightly
+            zombie.rotation.z = walkCycle * 0.1;
+        }
+        
         // Move zombie towards player if within detection range
         if (distanceToPlayer < zombieDetectionRange) {
             // Calculate direction to player
@@ -1190,17 +1216,6 @@ function updateZombies() {
             const wanderAngle = now * 0.0005 + i; // Different for each zombie
             zombie.position.x += Math.sin(wanderAngle) * zombieSpeed * 0.3;
             zombie.position.z += Math.cos(wanderAngle) * zombieSpeed * 0.3;
-        }
-        
-        // Simple walking animation
-        if (zombie.userData.isWalking) {
-            const walkCycle = Math.sin((now * 0.005) + zombie.userData.walkOffset) * 0.1;
-            
-            // Bob up and down slightly
-            zombie.position.y = Math.abs(walkCycle) * (zombie.userData.isBoss ? 2.0 : 0.5); // Bigger movement for boss
-            
-            // Tilt side to side slightly
-            zombie.rotation.z = walkCycle * 0.2;
         }
     }
 }
@@ -1339,20 +1354,34 @@ function handleZombieDeath(zombie, index) {
     // Death animation - fall over
     zombie.userData.isWalking = false;
     zombie.rotation.x = Math.PI / 2; // Fall forward
-    zombie.position.y = zombie.userData.isBoss ? 1.5 : 0.5; // Lower to ground
     
-    // Remove zombie after delay
-    setTimeout(() => {
-        scene.remove(zombie);
-        zombies.splice(zombies.indexOf(zombie), 1);
-        
-        // Update wave indicator to show remaining zombies
-        updateWaveIndicator();
+    // Set position to rest on the floor
+    // For a boss, we need to account for its larger size
+    const bodyRadius = zombie.userData.isBoss ? 0.5 * 10 : 0.5; // Body radius (scaled for boss)
+    zombie.position.y = bodyRadius; // Position exactly on the floor based on body radius
+    
+    // Store the timeout ID in the zombie object for cleanup
+    zombie.userData.removalTimeoutId = setTimeout(() => {
+        // Only remove if the zombie still exists in the scene
+        if (zombie.parent === scene && zombies.includes(zombie)) {
+            scene.remove(zombie);
+            zombies.splice(zombies.indexOf(zombie), 1);
+            
+            // Update wave indicator to show remaining zombies
+            updateWaveIndicator();
+        }
     }, 3000);
 }
 
 // Function to restart game
 function restartGame() {
+    // Clear any pending zombie removal timeouts
+    zombies.forEach(zombie => {
+        if (zombie.userData.removalTimeoutId) {
+            clearTimeout(zombie.userData.removalTimeoutId);
+        }
+    });
+    
     // Remove game over or win display
     const gameEndDisplay = document.querySelector('div:not(#crosshair):not(.score-display):not(.health-display):not(.wave-display)');
     if (gameEndDisplay) {
@@ -1487,14 +1516,111 @@ function checkHotkeys() {
             updateScoreDisplay();
         }
     }
+    
+    // P key to toggle pause
+    if (keys.p) {
+        // Only process once per keypress
+        keys.p = false;
+        
+        // Toggle pause state
+        togglePause();
+    }
 }
 
-// Animation loop
+// Add structured game state management
+const gameState = {
+    isPaused: false,
+    isGameOver: false,
+    isPointerLocked: false,
+    currentWave: 0,
+    isWaveInProgress: false,
+    isWaveTransition: false
+};
+
+// Function to manage pointer lock
+function managePointerLock(shouldLock) {
+    try {
+        if (shouldLock && !gameState.isPointerLocked) {
+            canvas.requestPointerLock();
+        } else if (!shouldLock && gameState.isPointerLocked) {
+            document.exitPointerLock();
+        }
+    } catch (error) {
+        console.error("Error managing pointer lock:", error);
+    }
+}
+
+// Function to toggle pause state
+function togglePause() {
+    gameState.isPaused = !gameState.isPaused;
+    
+    // Get pause menu element
+    const pauseMenu = document.getElementById('pauseMenu');
+    if (!pauseMenu) {
+        console.error("Pause menu element not found!");
+        return;
+    }
+    
+    if (gameState.isPaused) {
+        // Show pause menu
+        pauseMenu.style.display = 'block';
+        
+        // Unlock pointer when paused
+        managePointerLock(false);
+    } else {
+        // Hide pause menu
+        pauseMenu.style.display = 'none';
+        
+        // Re-lock pointer when unpausing
+        managePointerLock(true);
+    }
+}
+
+// Initialize pause menu and pointer lock event listeners
+function initializeGameControls() {
+    // Set up pointer lock event listeners
+    document.addEventListener('pointerlockchange', () => {
+        gameState.isPointerLocked = document.pointerLockElement === canvas;
+    });
+    
+    document.addEventListener('pointerlockerror', (event) => {
+        console.error("Pointer lock error:", event);
+        gameState.isPointerLocked = false;
+    });
+    
+    // Set up pause menu button listeners
+    const resumeButton = document.getElementById('resumeButton');
+    const restartButton = document.getElementById('restartButton');
+    
+    if (resumeButton) {
+        resumeButton.addEventListener('click', () => {
+            if (gameState.isPaused) {
+                togglePause();
+            }
+        });
+    } else {
+        console.error("Resume button not found!");
+    }
+    
+    if (restartButton) {
+        restartButton.addEventListener('click', () => {
+            if (gameState.isPaused) {
+                togglePause();
+                restartGame();
+            }
+        });
+    } else {
+        console.error("Restart button not found!");
+    }
+}
+
+// Animation loop with improved efficiency
 function animate() {
     requestAnimationFrame(animate);
     
-    // Only update game if not game over
-    if (!player.isGameOver) {
+    // Only update game if not game over and not paused
+    if (!player.isGameOver && !gameState.isPaused) {
+        // Full game update
         updateMovement();
         handleShooting();
         updateGunAnimation();
@@ -1513,9 +1639,29 @@ function animate() {
         target.applyQuaternion(camera.quaternion);
         target.add(camera.position);
         flashlight.target.position.copy(target);
+        
+        // Render at full frame rate when playing
+        renderer.render(scene, camera);
+    } else if (!player.isGameOver) {
+        // If paused but not game over, only check for hotkeys
+        checkHotkeys();
+        
+        // Render at reduced frame rate when paused (every 10 frames)
+        if (Math.floor(performance.now() / 100) % 10 === 0) {
+            renderer.render(scene, camera);
+        }
+    } else {
+        // Game over state, render at normal rate
+        renderer.render(scene, camera);
     }
-    
-    renderer.render(scene, camera);
+}
+
+// Initialize game controls when DOM is loaded
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeGameControls);
+} else {
+    // DOM already loaded, initialize immediately
+    initializeGameControls();
 }
 
 animate(); 
