@@ -13,78 +13,256 @@ export class Zombie {
         const zombie = new THREE.Group();
         
         // Scale factor for boss - make it building-sized
-        const scale = this.isBoss ? 10 : 1;
-        const color = this.isBoss ? 0x8B0000 : 0x2d9d2d; // Dark red for boss, green for regular
+        // Reduce overall size by 20%
+        const scale = this.isBoss ? 8 : 0.8;
         
-        // Zombie body - slightly hunched forward
-        const bodyGeometry = new THREE.CylinderGeometry(0.5 * scale, 0.3 * scale, 1.8 * scale, 8);
-        const bodyMaterial = new THREE.MeshStandardMaterial({ color: color });
-        const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-        body.position.y = 0.9 * scale;
-        // Add a forward hunch to the body
-        body.rotation.x = 0.2;
-        body.castShadow = true;
-        zombie.add(body);
+        // Add slight randomization to make each zombie unique
+        const randomFactor = Math.random() * 0.2 + 0.9; // 0.9 to 1.1
         
-        // Zombie head
-        const headGeometry = new THREE.SphereGeometry(0.4 * scale, 8, 8);
-        const headMaterial = new THREE.MeshStandardMaterial({ color: color });
+        // Base colors - using the low-poly style from the reference image
+        const skinColor = this.isBoss ? 0x8B0000 : 0x7da87b; // Greenish skin for zombies
+        const hairColor = Math.random() > 0.7 ? 0x3a2e27 : (Math.random() > 0.5 ? 0x553311 : 0x222222); // Various hair colors
+        const shirtColor = Math.random() > 0.5 ? 0x8B4513 : 0x556B2F; // Brown or dark olive green for villager clothes
+        const pantsColor = Math.random() > 0.5 ? 0x4B3621 : 0x5F5F5F; // Brown or gray pants
+        const bloodColor = 0x8a0303; // Dark red blood
+        
+        // HEAD - Low poly style
+        const headGeometry = new THREE.BoxGeometry(0.8 * scale, 0.9 * scale, 0.8 * scale);
+        const headMaterial = new THREE.MeshStandardMaterial({ 
+            color: skinColor,
+            roughness: 0.9,
+            metalness: 0.1
+        });
         const head = new THREE.Mesh(headGeometry, headMaterial);
-        // Adjust head position to match the hunched body
         head.position.y = 2.1 * scale;
-        head.position.z = -0.2 * scale; // Move head forward slightly to match hunched posture
         head.castShadow = true;
         zombie.add(head);
         
-        // Zombie arms - slightly longer and more dangling
-        const armGeometry = new THREE.CylinderGeometry(0.15 * scale, 0.15 * scale, 1.3 * scale, 8);
-        const armMaterial = new THREE.MeshStandardMaterial({ color: color });
+        // Hair - simple box on top of head
+        const hairGeometry = new THREE.BoxGeometry(0.85 * scale, 0.3 * scale, 0.85 * scale);
+        const hairMaterial = new THREE.MeshStandardMaterial({ color: hairColor });
+        const hair = new THREE.Mesh(hairGeometry, hairMaterial);
+        hair.position.y = 0.5 * scale;
+        hair.position.z = 0.05 * scale; // Slightly forward
+        head.add(hair);
         
-        const leftArm = new THREE.Mesh(armGeometry, armMaterial);
-        leftArm.position.set(-0.7 * scale, 0.9 * scale, 0);
-        leftArm.rotation.z = Math.PI / 4; // Angle arm outward
-        leftArm.rotation.x = 0.3; // Angle arm forward slightly
-        leftArm.castShadow = true;
-        zombie.add(leftArm);
+        // Eyes - white squares with black pupils
+        const eyeSocketGeometry = new THREE.BoxGeometry(0.2 * scale, 0.15 * scale, 0.05 * scale);
+        const eyeSocketMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
         
-        const rightArm = new THREE.Mesh(armGeometry, armMaterial);
-        rightArm.position.set(0.7 * scale, 0.9 * scale, 0);
-        rightArm.rotation.z = -Math.PI / 4; // Angle arm outward
-        rightArm.rotation.x = 0.3; // Angle arm forward slightly
-        rightArm.castShadow = true;
-        zombie.add(rightArm);
+        const leftEyeSocket = new THREE.Mesh(eyeSocketGeometry, eyeSocketMaterial);
+        leftEyeSocket.position.set(-0.2 * scale, 0.1 * scale, 0.4 * scale);
+        head.add(leftEyeSocket);
         
-        // Zombie legs - positioned wider apart for shambling stance
-        const legGeometry = new THREE.CylinderGeometry(0.2 * scale, 0.2 * scale, 1.2 * scale, 8);
-        const legMaterial = new THREE.MeshStandardMaterial({ color: color });
+        const rightEyeSocket = new THREE.Mesh(eyeSocketGeometry, eyeSocketMaterial);
+        rightEyeSocket.position.set(0.2 * scale, 0.1 * scale, 0.4 * scale);
+        head.add(rightEyeSocket);
         
-        const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
-        leftLeg.position.set(-0.4 * scale, -0.6 * scale, 0);
-        // Angle leg slightly outward
-        leftLeg.rotation.z = 0.1;
-        leftLeg.castShadow = true;
-        zombie.add(leftLeg);
-        
-        const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
-        rightLeg.position.set(0.4 * scale, -0.6 * scale, 0);
-        // Angle leg slightly outward
-        rightLeg.rotation.z = -0.1;
-        rightLeg.castShadow = true;
-        zombie.add(rightLeg);
-        
-        // Zombie eyes (red)
-        const eyeGeometry = new THREE.SphereGeometry(0.1 * scale, 8, 8);
-        const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+        const eyeGeometry = new THREE.BoxGeometry(0.1 * scale, 0.08 * scale, 0.06 * scale);
+        const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
         
         const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        leftEye.position.set(-0.2 * scale, 2.2 * scale, 0.3 * scale);
-        zombie.add(leftEye);
+        leftEye.position.set(0, 0, 0.01 * scale);
+        leftEyeSocket.add(leftEye);
         
         const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        rightEye.position.set(0.2 * scale, 2.2 * scale, 0.3 * scale);
-        zombie.add(rightEye);
+        rightEye.position.set(0, 0, 0.01 * scale);
+        rightEyeSocket.add(rightEye);
         
-        // Set zombie position - raise the zombie so legs are visible
+        // Mouth - bloody jaw
+        const jawGeometry = new THREE.BoxGeometry(0.5 * scale, 0.15 * scale, 0.1 * scale);
+        const jawMaterial = new THREE.MeshStandardMaterial({ color: bloodColor });
+        const jaw = new THREE.Mesh(jawGeometry, jawMaterial);
+        jaw.position.set(0, -0.3 * scale, 0.4 * scale);
+        jaw.name = 'jaw'; // Add name for animation
+        head.add(jaw);
+        
+        // Add blood dripping from mouth
+        const bloodDripGeometry = new THREE.BoxGeometry(0.4 * scale, 0.3 * scale, 0.05 * scale);
+        const bloodMaterial = new THREE.MeshStandardMaterial({ 
+            color: bloodColor,
+            transparent: true,
+            opacity: 0.9
+        });
+        const bloodDrip = new THREE.Mesh(bloodDripGeometry, bloodMaterial);
+        bloodDrip.position.set(0, -0.2 * scale, 0);
+        jaw.add(bloodDrip);
+        
+        // TORSO - Villager style with simple tunic/shirt
+        const torsoGeometry = new THREE.BoxGeometry(
+            0.9 * scale, 
+            1.2 * scale, 
+            0.5 * scale
+        );
+        const torsoMaterial = new THREE.MeshStandardMaterial({ 
+            color: shirtColor,
+            roughness: 0.9,
+            metalness: 0.1
+        });
+        const torso = new THREE.Mesh(torsoGeometry, torsoMaterial);
+        torso.position.y = 0.9 * scale;
+        torso.castShadow = true;
+        zombie.add(torso);
+        
+        // Add a rope belt
+        const beltGeometry = new THREE.BoxGeometry(0.95 * scale, 0.1 * scale, 0.55 * scale);
+        const beltMaterial = new THREE.MeshStandardMaterial({ color: 0x5C4033 }); // Brown rope color
+        const belt = new THREE.Mesh(beltGeometry, beltMaterial);
+        belt.position.set(0, -0.4 * scale, 0);
+        torso.add(belt);
+        
+        // Add blood splatter on shirt
+        const bloodSplatterGeometry = new THREE.BoxGeometry(0.7 * scale, 0.7 * scale, 0.06 * scale);
+        const bloodSplatter = new THREE.Mesh(bloodSplatterGeometry, bloodMaterial);
+        bloodSplatter.position.set(Math.random() * 0.3 * scale, -0.2 * scale, 0.26 * scale);
+        bloodSplatter.rotation.z = Math.random() * Math.PI / 4;
+        torso.add(bloodSplatter);
+        
+        // Add a torn patch
+        const tornPatchGeometry = new THREE.BoxGeometry(0.3 * scale, 0.4 * scale, 0.06 * scale);
+        const tornPatchMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x332211,
+            roughness: 1.0
+        });
+        const tornPatch = new THREE.Mesh(tornPatchGeometry, tornPatchMaterial);
+        tornPatch.position.set(Math.random() > 0.5 ? 0.3 : -0.3, 0.2 * scale, 0.26 * scale);
+        torso.add(tornPatch);
+        
+        // ARMS - Low poly style
+        // Upper arms
+        const upperArmGeometry = new THREE.BoxGeometry(
+            0.25 * scale, 
+            0.6 * scale, 
+            0.25 * scale
+        );
+        const armMaterial = new THREE.MeshStandardMaterial({ color: skinColor });
+        
+        // Left arm (upper + lower)
+        const leftUpperArm = new THREE.Mesh(upperArmGeometry, armMaterial);
+        leftUpperArm.position.set(-0.6 * scale, 1.1 * scale, 0);
+        leftUpperArm.rotation.z = Math.PI / 12; // Slight outward angle
+        leftUpperArm.castShadow = true;
+        leftUpperArm.name = 'leftUpperArm';
+        zombie.add(leftUpperArm);
+        
+        // Shirt sleeve
+        const sleeveGeometry = new THREE.BoxGeometry(0.3 * scale, 0.3 * scale, 0.3 * scale);
+        const leftSleeve = new THREE.Mesh(sleeveGeometry, torsoMaterial);
+        leftSleeve.position.set(0, 0.2 * scale, 0);
+        leftUpperArm.add(leftSleeve);
+        
+        // Lower left arm
+        const lowerArmGeometry = new THREE.BoxGeometry(
+            0.22 * scale, 
+            0.6 * scale, 
+            0.22 * scale
+        );
+        const leftLowerArm = new THREE.Mesh(lowerArmGeometry, armMaterial);
+        leftLowerArm.position.set(0, -0.6 * scale, 0);
+        leftLowerArm.rotation.x = 0.4; // Bend at elbow
+        leftLowerArm.name = 'leftLowerArm';
+        leftUpperArm.add(leftLowerArm);
+        
+        // Left hand
+        const handGeometry = new THREE.BoxGeometry(0.25 * scale, 0.25 * scale, 0.25 * scale);
+        const leftHand = new THREE.Mesh(handGeometry, armMaterial);
+        leftHand.position.set(0, -0.4 * scale, 0);
+        leftHand.name = 'leftHand';
+        leftLowerArm.add(leftHand);
+        
+        // Right arm (upper + lower) - mirror of left
+        const rightUpperArm = new THREE.Mesh(upperArmGeometry, armMaterial);
+        rightUpperArm.position.set(0.6 * scale, 1.1 * scale, 0);
+        rightUpperArm.rotation.z = -Math.PI / 12; // Slight outward angle
+        rightUpperArm.castShadow = true;
+        rightUpperArm.name = 'rightUpperArm';
+        zombie.add(rightUpperArm);
+        
+        // Shirt sleeve
+        const rightSleeve = new THREE.Mesh(sleeveGeometry, torsoMaterial);
+        rightSleeve.position.set(0, 0.2 * scale, 0);
+        rightUpperArm.add(rightSleeve);
+        
+        // Lower right arm
+        const rightLowerArm = new THREE.Mesh(lowerArmGeometry, armMaterial);
+        rightLowerArm.position.set(0, -0.6 * scale, 0);
+        rightLowerArm.rotation.x = 0.4; // Bend at elbow
+        rightLowerArm.name = 'rightLowerArm';
+        rightUpperArm.add(rightLowerArm);
+        
+        // Right hand
+        const rightHand = new THREE.Mesh(handGeometry, armMaterial);
+        rightHand.position.set(0, -0.4 * scale, 0);
+        rightHand.name = 'rightHand';
+        rightLowerArm.add(rightHand);
+        
+        // LEGS - Low poly style
+        // Pants
+        const pantsGeometry = new THREE.BoxGeometry(0.9 * scale, 0.4 * scale, 0.5 * scale);
+        const pantsMaterial = new THREE.MeshStandardMaterial({ color: pantsColor });
+        const pants = new THREE.Mesh(pantsGeometry, pantsMaterial);
+        pants.position.set(0, 0.1 * scale, 0);
+        pants.castShadow = true;
+        zombie.add(pants);
+        
+        // Left leg
+        const upperLegGeometry = new THREE.BoxGeometry(
+            0.35 * scale, 
+            0.8 * scale, 
+            0.35 * scale
+        );
+        const legMaterial = new THREE.MeshStandardMaterial({ color: pantsColor });
+        
+        const leftUpperLeg = new THREE.Mesh(upperLegGeometry, legMaterial);
+        leftUpperLeg.position.set(-0.25 * scale, -0.6 * scale, 0);
+        leftUpperLeg.name = 'leftUpperLeg';
+        zombie.add(leftUpperLeg);
+        
+        // Add blood/tear on left leg
+        const legTearGeometry = new THREE.BoxGeometry(0.4 * scale, 0.4 * scale, 0.4 * scale);
+        const legTear = new THREE.Mesh(legTearGeometry, bloodMaterial);
+        legTear.position.set(0, -0.2 * scale, 0.1 * scale);
+        legTear.scale.set(1, 1, 0.1); // Flatten it
+        leftUpperLeg.add(legTear);
+        
+        // Lower left leg
+        const lowerLegGeometry = new THREE.BoxGeometry(
+            0.3 * scale, 
+            0.8 * scale, 
+            0.3 * scale
+        );
+        const leftLowerLeg = new THREE.Mesh(lowerLegGeometry, legMaterial);
+        leftLowerLeg.position.set(0, -0.8 * scale, 0);
+        leftLowerLeg.name = 'leftLowerLeg';
+        leftUpperLeg.add(leftLowerLeg);
+        
+        // Left foot - simple sandal/boot
+        const footGeometry = new THREE.BoxGeometry(0.35 * scale, 0.15 * scale, 0.5 * scale);
+        const footMaterial = new THREE.MeshStandardMaterial({ color: 0x4B3621 }); // Brown leather
+        const leftFoot = new THREE.Mesh(footGeometry, footMaterial);
+        leftFoot.position.set(0, -0.45 * scale, 0.1 * scale);
+        leftFoot.name = 'leftFoot';
+        leftLowerLeg.add(leftFoot);
+        
+        // Right leg
+        const rightUpperLeg = new THREE.Mesh(upperLegGeometry, legMaterial);
+        rightUpperLeg.position.set(0.25 * scale, -0.6 * scale, 0);
+        rightUpperLeg.name = 'rightUpperLeg';
+        zombie.add(rightUpperLeg);
+        
+        // Lower right leg
+        const rightLowerLeg = new THREE.Mesh(lowerLegGeometry, skinColor); // Exposed leg - zombie damage
+        rightLowerLeg.position.set(0, -0.8 * scale, 0);
+        rightLowerLeg.name = 'rightLowerLeg';
+        rightUpperLeg.add(rightLowerLeg);
+        
+        // Right foot - simple sandal/boot
+        const rightFoot = new THREE.Mesh(footGeometry, footMaterial);
+        rightFoot.position.set(0, -0.45 * scale, 0.1 * scale);
+        rightFoot.name = 'rightFoot';
+        rightLowerLeg.add(rightFoot);
+        
+        // Set zombie position
         zombie.position.set(x, 1.5, z);
         
         // Add zombie data
@@ -151,8 +329,40 @@ export class Zombie {
             const baseHeight = this.isBoss ? 4.0 : 1.0;
             this.mesh.position.y = baseHeight + Math.abs(bobHeight);
             
-            // Tilt side to side slightly
+            // Tilt side to side slightly for shambling effect
             this.mesh.rotation.z = walkCycle * 0.1;
+            
+            // Rotate the whole body slightly for a more menacing look
+            this.mesh.rotation.y = Math.sin((now * 0.001) + this.mesh.userData.walkOffset) * 0.1;
+            
+            // Find limbs by traversing the mesh hierarchy
+            this.mesh.traverse((child) => {
+                // Animate arms - more exaggerated zombie-like swinging
+                if (child.name === 'leftUpperArm') {
+                    child.rotation.x = Math.sin(walkCycle) * 0.5;
+                }
+                else if (child.name === 'rightUpperArm') {
+                    child.rotation.x = Math.sin(walkCycle + Math.PI) * 0.5; // Opposite phase
+                }
+                // Animate legs - shambling gait
+                else if (child.name === 'leftUpperLeg') {
+                    child.rotation.x = Math.sin(walkCycle) * 0.4;
+                }
+                else if (child.name === 'rightUpperLeg') {
+                    child.rotation.x = Math.sin(walkCycle + Math.PI) * 0.4; // Opposite phase
+                }
+                // Animate lower legs for more realistic walking
+                else if (child.name === 'leftLowerLeg') {
+                    child.rotation.x = Math.sin(walkCycle + Math.PI/2) * 0.3 + 0.2; // Add offset to keep bent
+                }
+                else if (child.name === 'rightLowerLeg') {
+                    child.rotation.x = Math.sin(walkCycle + Math.PI*3/2) * 0.3 + 0.2; // Add offset to keep bent
+                }
+                // Animate jaw for chomping effect
+                else if (child.name === 'jaw') {
+                    child.rotation.x = Math.abs(Math.sin(walkCycle * 0.5)) * 0.3;
+                }
+            });
         }
         
         // Move zombie towards player if within detection range
@@ -337,18 +547,28 @@ export class Zombie {
     }
 
     die(onRemove) {
-        // Death animation - fall over
+        // Stop walking animation
         this.mesh.userData.isWalking = false;
-        this.mesh.rotation.x = Math.PI / 2; // Fall forward
         
-        // Set position to rest on the floor
-        const bodyRadius = this.isBoss ? 0.5 * 10 : 0.5; // Body radius (scaled for boss)
-        this.mesh.position.y = bodyRadius; // Position exactly on the floor based on body radius
+        // Fall forward
+        this.mesh.rotation.x = Math.PI / 2;
         
-        // Remove after a delay
+        // Add more blood - scale based on zombie size
+        const scale = this.isBoss ? 8 : 0.8; // Match the scale in createZombieMesh
+        const bloodGeometry = new THREE.BoxGeometry(1 * scale, 0.05 * scale, 1 * scale);
+        const bloodMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x8a0303,
+            transparent: true,
+            opacity: 0.8
+        });
+        const bloodPool = new THREE.Mesh(bloodGeometry, bloodMaterial);
+        bloodPool.position.y = -0.9 * scale;
+        bloodPool.rotation.x = -Math.PI / 2;
+        this.mesh.add(bloodPool);
+        
+        // Schedule removal
         setTimeout(() => {
-            this.scene.remove(this.mesh);
-            if (onRemove) onRemove(this);
+            if (onRemove) onRemove();
         }, 3000);
     }
 } 
