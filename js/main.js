@@ -1,4 +1,12 @@
 import * as THREE from 'three';
+import { Game } from './core/Game.js';
+import { Zombie } from './entities/Zombie.js';
+
+// Initialize and start the game when the DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    const game = new Game();
+    game.start();
+});
 
 // Scene setup
 const scene = new THREE.Scene();
@@ -123,7 +131,7 @@ const playerHeight = 2;
 
 // Player state
 const player = {
-    position: new THREE.Vector3(0, 1.7, 0),
+    position: new THREE.Vector3(0, 1.7, 10), // Changed from z=0 to z=10
     rotation: {
         horizontal: 0,
         vertical: 0
@@ -157,7 +165,8 @@ const keys = {
     s: false,
     d: false,
     z: false, // Add Z key for wave skipping
-    p: false // Add P key for pausing
+    p: false, // Add P key for pausing
+    b: false // Add B key for collision boundaries
 };
 let isPointerLocked = false;
 
@@ -867,37 +876,47 @@ function createWell(x, z) {
     well.add(base);
     
     // Well wall
-    const wallGeometry = new THREE.CylinderGeometry(1.5, 1.5, 2, 16);
+    const wallGeometry = new THREE.CylinderGeometry(1.5, 1.5, 1, 16);
     const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x808080 });
     const wall = new THREE.Mesh(wallGeometry, wallMaterial);
-    wall.position.y = 2;
+    wall.position.y = 1;
     wall.castShadow = true;
     wall.receiveShadow = true;
     well.add(wall);
     
     // Well roof supports
-    const supportGeometry = new THREE.BoxGeometry(0.3, 3, 0.3);
+    const supportGeometry = new THREE.BoxGeometry(0.3, 2, 0.3);
     const supportMaterial = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
     
     const support1 = new THREE.Mesh(supportGeometry, supportMaterial);
-    support1.position.set(1.5, 2.5, 0);
+    support1.position.set(1.5, 1.5, 0);
     well.add(support1);
     
     const support2 = new THREE.Mesh(supportGeometry, supportMaterial);
-    support2.position.set(-1.5, 2.5, 0);
+    support2.position.set(-1.5, 1.5, 0);
     well.add(support2);
     
     // Well roof
     const roofGeometry = new THREE.ConeGeometry(2.5, 1.5, 4);
     const roofMaterial = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
     const roof = new THREE.Mesh(roofGeometry, roofMaterial);
-    roof.position.y = 4.5;
+    roof.position.y = 3;
     roof.rotation.y = Math.PI / 4;
     roof.castShadow = true;
     roof.receiveShadow = true;
     well.add(roof);
     
     well.position.set(x, 0, z);
+    
+    // Add collision boundary for the well
+    collisionBoundaries.push({
+        type: 'well',
+        minX: x - 2.0,
+        maxX: x + 2.0,
+        minZ: z - 2.0,
+        maxZ: z + 2.0
+    });
+    
     return well;
 }
 
@@ -961,6 +980,8 @@ function createPathSection(x, z, width, length, rotation) {
     
     path.position.set(x, 0, z);
     path.rotation.y = rotation;
+    
+    // No collision boundary for paths
     return path;
 }
 
@@ -1085,11 +1106,7 @@ const mainHouse = createHouse(0, -15);
 scene.add(mainHouse);
 
 // Create some buildings
-const buildings = [
-    createBuilding(-30, -30, 10, 20, 10),
-    createBuilding(30, 30, 15, 25, 15),
-    createBuilding(-25, 25, 12, 18, 12)
-];
+const buildings = [];
 
 buildings.forEach(building => scene.add(building));
 
@@ -1114,14 +1131,12 @@ scene.add(crossPath);
 
 // Houses around the village
 const houses = [
-    createHouse(-15, -12),
-    createHouse(15, -15),
-    createHouse(-18, 15),
-    createHouse(20, 12),
-    createCottage(-10, 8),
-    createCottage(12, -5),
-    createCottage(-8, -20),
-    createCottage(8, 20)
+    createHouse(-15, -12), // Already far from paths
+    createHouse(15, -15), // Already far from paths
+    createHouse(-18, 15), // Already far from paths
+    createHouse(20, 12), // Already far from paths
+    createCottage(-10, 8), // Move further from cross path
+    createCottage(12, -8) // Move further from cross path
 ];
 houses.forEach(house => scene.add(house));
 
@@ -1131,38 +1146,40 @@ scene.add(barn);
 
 // Farm plots
 const farms = [
-    createFarmPlot(-25, 0, 10, 15),
-    createFarmPlot(25, 0, 10, 15)
+    createFarmPlot(-25, -10, 10, 15), // Moved south to avoid cross path
+    createFarmPlot(25, -10, 10, 15)   // Moved south to avoid cross path
 ];
 farms.forEach(farm => scene.add(farm));
 
 // Add fences around farms
 for (let i = 0; i < 5; i++) {
-    const fence1 = createFenceSection(-30 + i*2.3, -8, 0);
+    const fence1 = createFenceSection(-30 + i*2.3, -18, 0);  // Bottom fence for west farm
     scene.add(fence1);
-    const fence2 = createFenceSection(-30 + i*2.3, 8, 0);
+    const fence2 = createFenceSection(-30 + i*2.3, -2, 0);   // Top fence for west farm
     scene.add(fence2);
-    const fence3 = createFenceSection(20 + i*2.3, -8, 0);
+    const fence3 = createFenceSection(20 + i*2.3, -18, 0);   // Bottom fence for east farm
     scene.add(fence3);
-    const fence4 = createFenceSection(20 + i*2.3, 8, 0);
+    const fence4 = createFenceSection(20 + i*2.3, -2, 0);    // Top fence for east farm
     scene.add(fence4);
 }
 
 for (let i = 0; i < 4; i++) {
-    const fence1 = createFenceSection(-30, -6 + i*2.3, Math.PI/2);
+    const fence1 = createFenceSection(-30, -16 + i*2.3, Math.PI/2);  // Left fence for west farm
     scene.add(fence1);
-    const fence2 = createFenceSection(-20, -6 + i*2.3, Math.PI/2);
+    const fence2 = createFenceSection(-20, -16 + i*2.3, Math.PI/2);  // Right fence for west farm
     scene.add(fence2);
-    const fence3 = createFenceSection(30, -6 + i*2.3, Math.PI/2);
+    const fence3 = createFenceSection(30, -16 + i*2.3, Math.PI/2);   // Right fence for east farm
     scene.add(fence3);
-    const fence4 = createFenceSection(20, -6 + i*2.3, Math.PI/2);
+    const fence4 = createFenceSection(20, -16 + i*2.3, Math.PI/2);   // Left fence for east farm
     scene.add(fence4);
 }
 
-// Add trees around the village (fewer trees, more spread out)
-for (let i = 0; i < 20; i++) {
-    const angle = (i / 20) * Math.PI * 2;
-    const radius = 40 + Math.random() * 15;
+// Add trees around the village in a forest-like ring
+// Create a dense forest ring around the town
+for (let i = 0; i < 120; i++) { // Increased from 40 to 120 trees
+    const angle = (i / 120) * Math.PI * 2;
+    // Start trees closer to town (reduced from 45 to 30) but with more variation in distance
+    const radius = 30 + Math.random() * 30; // Trees will be placed between 30-60 units from center
     const x = Math.cos(angle) * radius;
     const z = Math.sin(angle) * radius;
     const tree = createTree(x, z);
@@ -1170,17 +1187,90 @@ for (let i = 0; i < 20; i++) {
     scene.add(tree);
 }
 
-// Add some random trees within the village
-for (let i = 0; i < 8; i++) {
-    const x = (Math.random() - 0.5) * 50;
-    const z = (Math.random() - 0.5) * 50;
-    // Don't place trees too close to the center
-    if (Math.sqrt(x*x + z*z) > 8) {
-        const tree = createTree(x, z);
-        trees.push(tree);
-        scene.add(tree);
-    }
+// Add dense clusters of trees in specific areas
+// Northeast forest
+for (let i = 0; i < 40; i++) { // Increased from 15 to 40 trees
+    const x = 35 + Math.random() * 30; // Start closer to town (changed from 50 to 35)
+    const z = -35 - Math.random() * 30; // Start closer to town (changed from -50 to -35)
+    const tree = createTree(x, z);
+    trees.push(tree);
+    scene.add(tree);
 }
+
+// Southwest forest
+for (let i = 0; i < 40; i++) { // Increased from 15 to 40 trees
+    const x = -35 - Math.random() * 30; // Start closer to town (changed from -50 to -35)
+    const z = 35 + Math.random() * 30; // Start closer to town (changed from 50 to 35)
+    const tree = createTree(x, z);
+    trees.push(tree);
+    scene.add(tree);
+}
+
+// Add additional forest clusters
+// Northwest forest
+for (let i = 0; i < 40; i++) {
+    const x = -35 - Math.random() * 30;
+    const z = -35 - Math.random() * 30;
+    const tree = createTree(x, z);
+    trees.push(tree);
+    scene.add(tree);
+}
+
+// Southeast forest
+for (let i = 0; i < 40; i++) {
+    const x = 35 + Math.random() * 30;
+    const z = 35 + Math.random() * 30;
+    const tree = createTree(x, z);
+    trees.push(tree);
+    scene.add(tree);
+}
+
+// Fill in gaps with random trees
+for (let i = 0; i < 60; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const radius = 35 + Math.random() * 25;
+    const x = Math.cos(angle) * radius;
+    const z = Math.sin(angle) * radius;
+    const tree = createTree(x, z);
+    trees.push(tree);
+    scene.add(tree);
+}
+
+// Clear collision boundaries that intersect with paths
+clearPathCollisionBoundaries();
+
+// Function to visualize collision boundaries (for debugging)
+function visualizeCollisionBoundaries() {
+    // Remove any existing visualizations
+    scene.children.forEach(child => {
+        if (child.name === 'boundaryVisualization') {
+            scene.remove(child);
+        }
+    });
+    
+    // Create new visualizations
+    collisionBoundaries.forEach(boundary => {
+        const width = boundary.maxX - boundary.minX;
+        const depth = boundary.maxZ - boundary.minZ;
+        const geometry = new THREE.BoxGeometry(width, 2, depth);
+        const material = new THREE.MeshBasicMaterial({ 
+            color: 0xff0000,
+            transparent: true,
+            opacity: 0.3
+        });
+        const visualization = new THREE.Mesh(geometry, material);
+        visualization.position.set(
+            (boundary.minX + boundary.maxX) / 2,
+            1,
+            (boundary.minZ + boundary.maxZ) / 2
+        );
+        visualization.name = 'boundaryVisualization';
+        scene.add(visualization);
+    });
+}
+
+// Call this to visualize boundaries (uncomment to debug)
+// visualizeCollisionBoundaries();
 
 // Event Listeners for movement
 document.addEventListener('keydown', (event) => {
@@ -1188,6 +1278,11 @@ document.addEventListener('keydown', (event) => {
     // Handle all keys in one place
     if (keys.hasOwnProperty(key)) {
         keys[key] = true;
+    }
+    
+    // Add debug key for collision boundaries
+    if (key === 'b') {
+        visualizeCollisionBoundaries();
     }
 });
 
@@ -1509,128 +1604,7 @@ function updateAmmoDisplay() {
     ammoDisplay.innerHTML = text;
 }
 
-// Function to create a zombie
-function createZombie(x, z, isBoss = false) {
-    const zombie = new THREE.Group();
-    
-    // Scale factor for boss - make it building-sized
-    const scale = isBoss ? 10 : 1; // Increased from 2.5 to 10 for boss
-    const color = isBoss ? 0x8B0000 : 0x2d9d2d; // Dark red for boss, green for regular
-    
-    // Zombie body - slightly hunched forward
-    const bodyGeometry = new THREE.CylinderGeometry(0.5 * scale, 0.3 * scale, 1.8 * scale, 8);
-    const bodyMaterial = new THREE.MeshStandardMaterial({ color: color });
-    const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-    body.position.y = 0.9 * scale;
-    // Add a forward hunch to the body
-    body.rotation.x = 0.2;
-    body.castShadow = true;
-    zombie.add(body);
-    
-    // Zombie head
-    const headGeometry = new THREE.SphereGeometry(0.4 * scale, 8, 8);
-    const headMaterial = new THREE.MeshStandardMaterial({ color: color });
-    const head = new THREE.Mesh(headGeometry, headMaterial);
-    // Adjust head position to match the hunched body
-    head.position.y = 2.1 * scale;
-    head.position.z = -0.2 * scale; // Move head forward slightly to match hunched posture
-    head.castShadow = true;
-    zombie.add(head);
-    
-    // Zombie arms - slightly longer and more dangling
-    const armGeometry = new THREE.CylinderGeometry(0.15 * scale, 0.15 * scale, 1.3 * scale, 8);
-    const armMaterial = new THREE.MeshStandardMaterial({ color: color });
-    
-    const leftArm = new THREE.Mesh(armGeometry, armMaterial);
-    leftArm.position.set(-0.7 * scale, 0.9 * scale, 0);
-    leftArm.rotation.z = Math.PI / 4; // Angle arm outward
-    leftArm.rotation.x = 0.3; // Angle arm forward slightly
-    leftArm.castShadow = true;
-    zombie.add(leftArm);
-    
-    const rightArm = new THREE.Mesh(armGeometry, armMaterial);
-    rightArm.position.set(0.7 * scale, 0.9 * scale, 0);
-    rightArm.rotation.z = -Math.PI / 4; // Angle arm outward
-    rightArm.rotation.x = 0.3; // Angle arm forward slightly
-    rightArm.castShadow = true;
-    zombie.add(rightArm);
-    
-    // Zombie legs - positioned wider apart for shambling stance
-    const legGeometry = new THREE.CylinderGeometry(0.2 * scale, 0.2 * scale, 1.2 * scale, 8); // Shortened from 1.5 to 1.2
-    const legMaterial = new THREE.MeshStandardMaterial({ color: color });
-    
-    const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
-    leftLeg.position.set(-0.4 * scale, -0.6 * scale, 0); // Raised from -0.75 to -0.6
-    // Angle leg slightly outward
-    leftLeg.rotation.z = 0.1;
-    leftLeg.castShadow = true;
-    zombie.add(leftLeg);
-    
-    const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
-    rightLeg.position.set(0.4 * scale, -0.6 * scale, 0); // Raised from -0.75 to -0.6
-    // Angle leg slightly outward
-    rightLeg.rotation.z = -0.1;
-    rightLeg.castShadow = true;
-    zombie.add(rightLeg);
-    
-    // Zombie eyes (red) - keeping these the same as they're already good
-    const eyeGeometry = new THREE.SphereGeometry(0.1 * scale, 8, 8);
-    const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-    
-    const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-    leftEye.position.set(-0.2 * scale, 2.2 * scale, 0.3 * scale);
-    zombie.add(leftEye);
-    
-    const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-    rightEye.position.set(0.2 * scale, 2.2 * scale, 0.3 * scale);
-    zombie.add(rightEye);
-    
-    // Set zombie position - raise the zombie so legs are visible
-    zombie.position.set(x, 1.5, z); // Raised from 0.75 to 1.5 to make legs more visible
-    
-    // Add zombie data
-    zombie.userData = {
-        health: isBoss ? 200 : 100, // Reduced boss health from 1000 to 200
-        maxHealth: isBoss ? 200 : 100, // Also update maxHealth
-        isWalking: true,
-        walkOffset: Math.random() * Math.PI * 2, // Random starting phase for walking animation
-        lastAnimationUpdate: Date.now(),
-        type: 'zombie',
-        isBoss: isBoss,
-        damage: isBoss ? 30 : 10 // Boss does more damage
-    };
-    
-    // Add health bar for all zombies
-    const healthBarWidth = isBoss ? 8 : 1; // Wider health bar for boss
-    const healthBarHeight = isBoss ? 0.5 : 0.1; // Taller health bar for boss
-    const healthBarYPosition = isBoss ? 5 * scale : 2.8; // Higher position for boss health bar
-    
-    // Health bar background
-    const healthBarBgGeometry = new THREE.BoxGeometry(healthBarWidth, healthBarHeight, 0.1);
-    const healthBarBgMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
-    const healthBarBg = new THREE.Mesh(healthBarBgGeometry, healthBarBgMaterial);
-    healthBarBg.position.y = healthBarYPosition;
-    zombie.add(healthBarBg);
-    
-    // Health bar foreground (actual health)
-    const healthBarFgGeometry = new THREE.BoxGeometry(healthBarWidth, healthBarHeight, 0.11);
-    const healthBarFgMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-    const healthBarFg = new THREE.Mesh(healthBarFgGeometry, healthBarFgMaterial);
-    healthBarFg.position.y = healthBarYPosition;
-    healthBarFg.userData.isHealthBar = true;
-    zombie.add(healthBarFg);
-    
-    // Only show health bars when damaged for regular zombies
-    if (!isBoss) {
-        healthBarBg.visible = false;
-        healthBarFg.visible = false;
-    }
-    
-    scene.add(zombie);
-    zombies.push(zombie);
-    
-    return zombie;
-}
+// Zombie creation is now handled by the Zombie class in js/entities/Zombie.js
 
 // Function to spawn zombies for the current wave
 function spawnWaveZombies() {
@@ -1638,6 +1612,7 @@ function spawnWaveZombies() {
     
     // If wave is not in progress, start it
     if (!waveSystem.isWaveInProgress) {
+        console.log(`Starting wave ${waveSystem.currentWave} with ${waveSystem.zombiesPerWave[waveSystem.currentWave - 1]} zombies`);
         waveSystem.isWaveInProgress = true;
         waveSystem.zombiesRemaining = waveSystem.zombiesPerWave[waveSystem.currentWave - 1];
         
@@ -1673,14 +1648,16 @@ function spawnWaveZombies() {
             
             // If we found a valid position, create the boss
             if (validPosition) {
-                createZombie(x, z, true); // Create boss zombie
+                const bossZombie = new Zombie(scene, x, z, true);
+                zombies.push(bossZombie);
             } else {
                 // Fallback: spawn boss at a fixed distance in a random direction
                 const angle = Math.random() * Math.PI * 2;
                 const distance = 50; // Spawn far away to avoid buildings
                 x = player.position.x + Math.cos(angle) * distance;
                 z = player.position.z + Math.sin(angle) * distance;
-                createZombie(x, z, true);
+                const bossZombie = new Zombie(scene, x, z, true);
+                zombies.push(bossZombie);
             }
         } else {
             // For regular waves, spawn zombies in groups
@@ -1766,15 +1743,18 @@ function spawnWaveZombies() {
                 
                 // Create zombie at valid position or at spawn point if no valid position found
                 if (validPosition) {
-                    createZombie(x, z, false);
+                    const zombie = new Zombie(scene, x, z, false);
+                    zombies.push(zombie);
                 } else {
-                    createZombie(spawnPoint.x, spawnPoint.z, false);
+                    const zombie = new Zombie(scene, spawnPoint.x, spawnPoint.z, false);
+                    zombies.push(zombie);
                 }
             }
         }
         
         // Update the wave indicator with zombies remaining
         updateWaveIndicator();
+        console.log(`Wave ${waveSystem.currentWave} started with ${waveSystem.zombiesRemaining} zombies remaining`);
     }
 }
 
@@ -1804,13 +1784,16 @@ function checkWaveCompletion() {
     }
     
     // If wave is in progress and all zombies are dead, complete the wave
-    if (waveSystem.isWaveInProgress && zombies.length === 0) {
+    if (waveSystem.isWaveInProgress && waveSystem.zombiesRemaining <= 0) {
+        console.log("All zombies defeated, completing wave");
         completeWave();
     }
 }
 
 // Function to complete the current wave
 function completeWave() {
+    console.log(`Completing wave ${waveSystem.currentWave}`);
+    
     // If this was the final wave, player wins
     if (waveSystem.currentWave === waveSystem.maxWaves) {
         handleGameWin();
@@ -1820,6 +1803,8 @@ function completeWave() {
     // Otherwise, prepare for the next wave
     waveSystem.currentWave++;
     waveSystem.isWaveInProgress = false;
+    
+    console.log(`Moving to wave ${waveSystem.currentWave}`);
     
     // Show wave complete message
     showWaveMessage(`Wave ${waveSystem.currentWave - 1} Complete!`);
@@ -1840,6 +1825,16 @@ function completeWave() {
     
     // Update the wave indicator
     updateWaveIndicator();
+    
+    // Start the next wave after a short delay
+    setTimeout(() => {
+        console.log(`Starting next wave ${waveSystem.currentWave} after delay`);
+        // Reset wave state to trigger new zombie spawns
+        waveSystem.isWaveInProgress = false;
+        waveSystem.zombiesRemaining = waveSystem.zombiesPerWave[waveSystem.currentWave - 1];
+        // Force spawn zombies for the next wave
+        spawnWaveZombies();
+    }, 3000); // 3 second delay before next wave
 }
 
 // Function to handle game win
@@ -1914,8 +1909,7 @@ document.body.appendChild(waveIndicator);
 
 // Function to update wave indicator
 function updateWaveIndicator() {
-    const zombiesRemaining = zombies.filter(zombie => zombie.userData.health > 0).length;
-    waveIndicator.innerHTML = `Wave: ${waveSystem.currentWave}/${waveSystem.maxWaves} - Zombies: ${zombiesRemaining}`;
+    waveIndicator.innerHTML = `Wave: ${waveSystem.currentWave}/${waveSystem.maxWaves} - Zombies: ${waveSystem.zombiesRemaining}`;
 }
 
 // Function to update zombies
@@ -1926,39 +1920,39 @@ function updateZombies() {
         const zombie = zombies[i];
         
         // Skip if zombie is dead
-        if (zombie.userData.health <= 0) continue;
+        if (zombie.mesh.userData.health <= 0) continue;
         
         // Calculate distance to player
-        const distanceToPlayer = zombie.position.distanceTo(new THREE.Vector3(
+        const distanceToPlayer = zombie.mesh.position.distanceTo(new THREE.Vector3(
             player.position.x,
             0, // Ignore Y axis for distance calculation
             player.position.z
         ));
         
         // Add bobbing motion to make zombies more zombie-like
-        if (zombie.userData.isWalking) {
-            const walkCycle = Math.sin((now * 0.005) + zombie.userData.walkOffset);
+        if (zombie.mesh.userData.isWalking) {
+            const walkCycle = Math.sin((now * 0.005) + zombie.mesh.userData.walkOffset);
             const bobHeight = walkCycle * 0.2; // More pronounced bobbing
-            const baseHeight = zombie.userData.isBoss ? 4.0 : 1.0; // Lowered from 5.0/1.5 to 4.0/1.0
-            zombie.position.y = baseHeight + Math.abs(bobHeight);
+            const baseHeight = zombie.mesh.userData.isBoss ? 4.0 : 1.0; // Lowered from 5.0/1.5 to 4.0/1.0
+            zombie.mesh.position.y = baseHeight + Math.abs(bobHeight);
             
             // Tilt side to side slightly
-            zombie.rotation.z = walkCycle * 0.1;
+            zombie.mesh.rotation.z = walkCycle * 0.1;
         }
         
         // Move zombie towards player if within detection range
         if (distanceToPlayer < zombieDetectionRange) {
             // Calculate direction to player
             const direction = new THREE.Vector3(
-                player.position.x - zombie.position.x,
+                player.position.x - zombie.mesh.position.x,
                 0, // Don't move up/down
-                player.position.z - zombie.position.z
+                player.position.z - zombie.mesh.position.z
             ).normalize();
             
             // Calculate intended position
-            const speed = zombie.userData.isBoss ? zombieSpeed * 0.9 : zombieSpeed;
-            const newX = zombie.position.x + direction.x * speed;
-            const newZ = zombie.position.z + direction.z * speed;
+            const speed = zombie.mesh.userData.isBoss ? zombieSpeed * 0.9 : zombieSpeed;
+            const newX = zombie.mesh.position.x + direction.x * speed;
+            const newZ = zombie.mesh.position.z + direction.z * speed;
             
             // Check for collisions with buildings
             let canMove = true;
@@ -1974,35 +1968,35 @@ function updateZombies() {
             
             // Only move if no collision
             if (canMove) {
-                zombie.position.x = newX;
-                zombie.position.z = newZ;
+                zombie.mesh.position.x = newX;
+                zombie.mesh.position.z = newZ;
             } else {
                 // Try to navigate around obstacles by trying different directions
                 // Try moving only in X direction
-                const newXOnly = zombie.position.x + direction.x * speed;
+                const newXOnly = zombie.mesh.position.x + direction.x * speed;
                 let canMoveX = true;
                 
                 for (const boundary of collisionBoundaries) {
                     if (newXOnly + zombieCollisionRadius > boundary.minX && 
                         newXOnly - zombieCollisionRadius < boundary.maxX && 
-                        zombie.position.z + zombieCollisionRadius > boundary.minZ && 
-                        zombie.position.z - zombieCollisionRadius < boundary.maxZ) {
+                        zombie.mesh.position.z + zombieCollisionRadius > boundary.minZ && 
+                        zombie.mesh.position.z - zombieCollisionRadius < boundary.maxZ) {
                         canMoveX = false;
                         break;
                     }
                 }
                 
                 if (canMoveX) {
-                    zombie.position.x = newXOnly;
+                    zombie.mesh.position.x = newXOnly;
                 }
                 
                 // Try moving only in Z direction
-                const newZOnly = zombie.position.z + direction.z * speed;
+                const newZOnly = zombie.mesh.position.z + direction.z * speed;
                 let canMoveZ = true;
                 
                 for (const boundary of collisionBoundaries) {
-                    if (zombie.position.x + zombieCollisionRadius > boundary.minX && 
-                        zombie.position.x - zombieCollisionRadius < boundary.maxX && 
+                    if (zombie.mesh.position.x + zombieCollisionRadius > boundary.minX && 
+                        zombie.mesh.position.x - zombieCollisionRadius < boundary.maxX && 
                         newZOnly + zombieCollisionRadius > boundary.minZ && 
                         newZOnly - zombieCollisionRadius < boundary.maxZ) {
                         canMoveZ = false;
@@ -2011,22 +2005,22 @@ function updateZombies() {
                 }
                 
                 if (canMoveZ) {
-                    zombie.position.z = newZOnly;
+                    zombie.mesh.position.z = newZOnly;
                 }
             }
             
             // Rotate zombie to face player
-            zombie.rotation.y = Math.atan2(direction.x, direction.z);
+            zombie.mesh.rotation.y = Math.atan2(direction.x, direction.z);
             
             // Attack player if close enough
-            if (distanceToPlayer < (zombie.userData.isBoss ? 8 : 2) && !player.isGameOver) { // Larger attack range for boss
+            if (distanceToPlayer < (zombie.mesh.userData.isBoss ? 8 : 2) && !player.isGameOver) { // Larger attack range for boss
                 attackPlayer(zombie);
             }
         } else {
             // Random wandering behavior
             const wanderAngle = now * 0.0005 + i; // Different for each zombie
-            const newX = zombie.position.x + Math.sin(wanderAngle) * zombieSpeed * 0.3;
-            const newZ = zombie.position.z + Math.cos(wanderAngle) * zombieSpeed * 0.3;
+            const newX = zombie.mesh.position.x + Math.sin(wanderAngle) * zombieSpeed * 0.3;
+            const newZ = zombie.mesh.position.z + Math.cos(wanderAngle) * zombieSpeed * 0.3;
             
             // Check for collisions with buildings
             let canMove = true;
@@ -2042,8 +2036,8 @@ function updateZombies() {
             
             // Only move if no collision
             if (canMove) {
-                zombie.position.x = newX;
-                zombie.position.z = newZ;
+                zombie.mesh.position.x = newX;
+                zombie.mesh.position.z = newZ;
             }
         }
     }
@@ -2053,32 +2047,26 @@ function updateZombies() {
 function attackPlayer(zombie) {
     const now = Date.now();
     
-    // Check if player can take damage (cooldown expired)
     if (now - player.lastDamageTime > player.damageCooldown) {
         // Apply damage to player
-        player.health -= zombie.userData.damage; // Use zombie's damage value
+        player.health -= zombie.mesh.userData.damage;
         player.lastDamageTime = now;
+        
+        // Show damage flash
+        damageFlash();
         
         // Update health display
         updateHealthDisplay();
         
-        // Visual feedback - screen flash
-        damageFlash();
-        
-        // Check if player is dead
-        if (player.health <= 0) {
-            handleGameOver();
-        }
-        
         // Zombie attack animation - lunge forward slightly
         const direction = new THREE.Vector3(
-            player.position.x - zombie.position.x,
+            player.position.x - zombie.mesh.position.x,
             0,
-            player.position.z - zombie.position.z
+            player.position.z - zombie.mesh.position.z
         ).normalize();
         
-        zombie.position.x += direction.x * 0.5;
-        zombie.position.z += direction.z * 0.5;
+        zombie.mesh.position.x += direction.x * 0.5;
+        zombie.mesh.position.z += direction.z * 0.5;
     }
 }
 
@@ -2093,22 +2081,22 @@ function checkBulletCollisions() {
             const zombie = zombies[j];
             
             // Skip if zombie is already dead
-            if (zombie.userData.health <= 0) continue;
+            if (zombie.mesh.userData.health <= 0) continue;
             
             // Check distance between bullet and zombie (simple collision detection)
-            const distance = bullet.position.distanceTo(zombie.position);
+            const distance = bullet.position.distanceTo(zombie.mesh.position);
             
             // Adjust hit radius based on whether it's a boss
-            const hitRadius = zombie.userData.isBoss ? 5 : 1.5; // Increased boss hit radius from 3 to 5
+            const hitRadius = zombie.mesh.userData.isBoss ? 5 : 1.5; // Increased boss hit radius from 3 to 5
             
             if (distance < hitRadius) { // If bullet hits zombie
                 // Damage zombie - regular zombies die in one hit, boss takes bullet damage
-                if (zombie.userData.isBoss) {
+                if (zombie.mesh.userData.isBoss) {
                     // Make sure boss takes damage
-                    zombie.userData.health = Math.max(0, zombie.userData.health - bullet.userData.damage);
-                    console.log(`Boss hit! Health: ${zombie.userData.health}/${zombie.userData.maxHealth}`);
+                    zombie.mesh.userData.health = Math.max(0, zombie.mesh.userData.health - bullet.userData.damage);
+                    console.log(`Boss hit! Health: ${zombie.mesh.userData.health}/${zombie.mesh.userData.maxHealth}`);
                 } else {
-                    zombie.userData.health = 0; // Regular zombies die in one hit
+                    zombie.mesh.userData.health = 0; // Regular zombies die in one hit
                 }
                 
                 // Create blood effect
@@ -2119,7 +2107,7 @@ function checkBulletCollisions() {
                 bullets.splice(i, 1);
                 
                 // Show health bar for all zombies when hit
-                zombie.children.forEach(child => {
+                zombie.mesh.children.forEach(child => {
                     // Make all health bar components visible
                     if (child.userData && child.userData.isHealthBar) {
                         child.visible = true;
@@ -2136,7 +2124,7 @@ function checkBulletCollisions() {
                 updateZombieHealthBar(zombie);
                 
                 // If zombie is dead
-                if (zombie.userData.health <= 0) {
+                if (zombie.mesh.userData.health <= 0) {
                     handleZombieDeath(zombie, j);
                 }
                 
@@ -2152,24 +2140,24 @@ function updateZombieHealthBar(zombie) {
     // Find the health bar in the zombie's children
     let healthBar = null;
     
-    zombie.children.forEach(child => {
+    zombie.mesh.children.forEach(child => {
         if (child.userData.isHealthBar) {
             healthBar = child;
             
             // Calculate health percentage
-            const healthPercent = Math.max(0, zombie.userData.health / zombie.userData.maxHealth);
+            const healthPercent = Math.max(0, zombie.mesh.userData.health / zombie.mesh.userData.maxHealth);
             
             // Update health bar scale
-            child.scale.x = healthPercent;
+            healthBar.scale.x = healthPercent;
             
             // Adjust position to keep left-aligned
-            const barWidth = zombie.userData.isBoss ? 8 : 1; // Updated from 3 to 8 for boss
-            child.position.x = (1 - healthPercent) * (-barWidth/2);
+            const barWidth = zombie.mesh.userData.isBoss ? 8 : 1; // Updated from 3 to 8 for boss
+            healthBar.position.x = (1 - healthPercent) * (-barWidth/2);
         }
     });
     
     // If we couldn't find the health bar, log an error
-    if (!healthBar && zombie.userData.health > 0) {
+    if (!healthBar && zombie.mesh.userData.health > 0) {
         console.error("Could not find health bar for zombie", zombie);
     }
 }
@@ -2177,37 +2165,46 @@ function updateZombieHealthBar(zombie) {
 // Function to handle zombie death
 function handleZombieDeath(zombie, index) {
     // Increase player score (boss worth more points)
-    player.score += zombie.userData.isBoss ? 100 : 10;
+    player.score += zombie.mesh.userData.isBoss ? 100 : 10;
     updateScoreDisplay();
     
+    // Decrement zombies remaining in the wave
+    waveSystem.zombiesRemaining = Math.max(0, waveSystem.zombiesRemaining - 1);
+    
+    // Update the wave indicator
+    updateWaveIndicator();
+    
     // Death animation - fall over
-    zombie.userData.isWalking = false;
-    zombie.rotation.x = Math.PI / 2; // Fall forward
+    zombie.mesh.userData.isWalking = false;
+    zombie.mesh.rotation.x = Math.PI / 2; // Fall forward
     
     // Set position to rest on the floor
     // For a boss, we need to account for its larger size
-    const bodyRadius = zombie.userData.isBoss ? 0.5 * 10 : 0.5; // Body radius (scaled for boss)
-    zombie.position.y = bodyRadius; // Position exactly on the floor based on body radius
+    const bodyRadius = zombie.mesh.userData.isBoss ? 0.5 * 10 : 0.5; // Body radius (scaled for boss)
+    zombie.mesh.position.y = bodyRadius; // Position exactly on the floor based on body radius
     
     // Store the timeout ID in the zombie object for cleanup
-    zombie.userData.removalTimeoutId = setTimeout(() => {
+    zombie.mesh.userData.removalTimeoutId = setTimeout(() => {
         // Only remove if the zombie still exists in the scene
-        if (zombie.parent === scene && zombies.includes(zombie)) {
-            scene.remove(zombie);
+        if (zombie.mesh.parent === scene && zombies.includes(zombie)) {
+            scene.remove(zombie.mesh);
             zombies.splice(zombies.indexOf(zombie), 1);
             
-            // Update wave indicator to show remaining zombies
-            updateWaveIndicator();
+            // Check if wave is complete
+            checkWaveCompletion();
         }
-    }, 3000);
+    }, 3000); // Remove after 3 seconds
+    
+    // Create blood effect at zombie position
+    createBloodEffect(zombie.mesh.position.clone());
 }
 
 // Function to restart game
 function restartGame() {
     // Clear any pending zombie removal timeouts
     zombies.forEach(zombie => {
-        if (zombie.userData.removalTimeoutId) {
-            clearTimeout(zombie.userData.removalTimeoutId);
+        if (zombie.mesh.userData.removalTimeoutId) {
+            clearTimeout(zombie.mesh.userData.removalTimeoutId);
         }
     });
     
@@ -2221,7 +2218,7 @@ function restartGame() {
     player.health = player.maxHealth;
     player.score = 0;
     player.isGameOver = false;
-    player.position.set(0, playerHeight, 5);
+    player.position.set(0, playerHeight, 10); // Changed from z=5 to z=10
     player.rotation.horizontal = 0;
     player.rotation.vertical = 0;
     
@@ -2233,7 +2230,7 @@ function restartGame() {
     
     // Remove all zombies
     for (let i = zombies.length - 1; i >= 0; i--) {
-        scene.remove(zombies[i]);
+        scene.remove(zombies[i].mesh);
     }
     zombies.length = 0;
     
@@ -2332,7 +2329,7 @@ function checkHotkeys() {
         if (waveSystem.isWaveInProgress && !waveSystem.isWaveTransition) {
             // Remove all zombies
             for (let i = zombies.length - 1; i >= 0; i--) {
-                scene.remove(zombies[i]);
+                scene.remove(zombies[i].mesh);
             }
             zombies.length = 0;
             
@@ -2609,4 +2606,58 @@ function handleGameOver() {
     
     // Play death sound if available
     // if (soundEffects.death) soundEffects.death.play();
-} 
+}
+
+// Function to clear collision boundaries that intersect with paths
+function clearPathCollisionBoundaries() {
+    // Define the main path bounds (north-south path)
+    const mainPathMinX = -3; // 6 units wide, centered at x=0
+    const mainPathMaxX = 3;
+    const mainPathMinZ = -30; // 60 units long, centered at z=0
+    const mainPathMaxZ = 30;
+    
+    // Define the cross path bounds (east-west path)
+    const crossPathMinX = -30; // 60 units long, centered at x=0
+    const crossPathMaxX = 30;
+    const crossPathMinZ = -3; // 6 units wide, centered at z=0
+    const crossPathMaxZ = 3;
+    
+    // Filter out boundaries that intersect with the paths, except for the well
+    const newBoundaries = [];
+    
+    for (let i = 0; i < collisionBoundaries.length; i++) {
+        const boundary = collisionBoundaries[i];
+        
+        // Always keep the well boundary
+        if (boundary.type === 'well') {
+            newBoundaries.push(boundary);
+            continue;
+        }
+        
+        // Check if boundary intersects with main path
+        const intersectsMainPath = 
+            boundary.maxX > mainPathMinX && 
+            boundary.minX < mainPathMaxX && 
+            boundary.maxZ > mainPathMinZ && 
+            boundary.minZ < mainPathMaxZ;
+            
+        // Check if boundary intersects with cross path
+        const intersectsCrossPath = 
+            boundary.maxX > crossPathMinX && 
+            boundary.minX < crossPathMaxX && 
+            boundary.maxZ > crossPathMinZ && 
+            boundary.minZ < crossPathMaxZ;
+            
+        // If it doesn't intersect with either path, keep it
+        if (!intersectsMainPath && !intersectsCrossPath) {
+            newBoundaries.push(boundary);
+        }
+    }
+    
+    // Replace the collision boundaries array with our filtered version
+    collisionBoundaries.length = 0;
+    collisionBoundaries.push(...newBoundaries);
+}
+
+// Call this function after creating all buildings and before the game starts
+clearPathCollisionBoundaries();
