@@ -9,7 +9,7 @@ const audioSystem = {
     
     // Initialize the background music
     initBackgroundMusic() {
-        this.backgroundMusic = new Audio('assets/audio/village.mp3');
+        this.backgroundMusic = new Audio('assets/audio/Village.mp3');
         this.backgroundMusic.loop = true;
         this.backgroundMusic.volume = 0.5; // Set volume to 50%
     },
