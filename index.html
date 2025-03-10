@@ -9,6 +9,7 @@
             margin: 0;
             overflow: hidden;
             background-color: #000;
+            font-family: 'Arial', sans-serif;
         }
         canvas {
             width: 100%;
@@ -24,51 +25,172 @@
             font-size: 24px;
             pointer-events: none;
             user-select: none;
+            display: none; /* Hide initially */
         }
-        #pauseMenu {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: rgba(0, 0, 0, 0.8);
+        .game-menu {
+            background-color: rgba(0, 0, 0, 0.85);
             color: white;
-            padding: 20px;
+            padding: 30px;
             border-radius: 10px;
             text-align: center;
-            display: none;
-            z-index: 100;
-            min-width: 300px;
+            min-width: 350px;
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+            border: 2px solid #ff0000;
         }
-        #pauseMenu h2 {
+        .game-menu h1, .game-menu h2 {
             margin-top: 0;
             color: #ff0000;
+            text-shadow: 0 0 10px rgba(255, 0, 0, 0.7);
         }
-        #pauseMenu p {
-            margin: 10px 0;
+        .game-menu p {
+            margin: 15px 0;
+            font-size: 18px;
         }
-        #pauseMenu button {
+        .game-menu button {
             background-color: #ff0000;
             color: white;
             border: none;
-            padding: 10px 20px;
-            margin: 10px;
+            padding: 12px 25px;
+            margin: 15px 10px;
             border-radius: 5px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 18px;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            font-weight: bold;
         }
-        #pauseMenu button:hover {
+        .game-menu button:hover {
             background-color: #cc0000;
+            transform: scale(1.05);
+            box-shadow: 0 0 10px rgba(255, 0, 0, 0.7);
+        }
+        #startScreen {
+            display: block;
+            background-color: rgba(0, 0, 0, 0.9);
+            box-shadow: 0 0 30px rgba(255, 0, 0, 0.7);
+            border: 3px solid #800000;
+            max-width: 400px;
+            width: 80%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 100;
+        }
+        #pauseMenu {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 100;
+        }
+        .game-title {
+            font-size: 48px;
+            margin-bottom: 20px;
+            letter-spacing: 4px;
+            font-family: 'Impact', sans-serif;
+            text-transform: uppercase;
+            color: #ff0000;
+            text-shadow: 0 0 15px #ff0000, 0 0 5px #800000;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { text-shadow: 0 0 15px #ff0000, 0 0 5px #800000; }
+            50% { text-shadow: 0 0 25px #ff0000, 0 0 10px #800000; }
+            100% { text-shadow: 0 0 15px #ff0000, 0 0 5px #800000; }
+        }
+        .game-description {
+            margin-bottom: 20px;
+            line-height: 1.4;
+            color: #cccccc;
+            font-size: 16px;
+            text-shadow: 1px 1px 3px #000;
+        }
+        .controls-info {
+            text-align: left;
+            margin: 15px auto;
+            max-width: 280px;
+            font-size: 14px;
+            background-color: rgba(50, 0, 0, 0.5);
+            padding: 12px;
+            border-radius: 5px;
+            border: 1px solid #800000;
+        }
+        .controls-info div {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        .key {
+            background-color: #333;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #ff0000;
+            border: 1px solid #800000;
+        }
+        #startButton {
+            background-color: #800000;
+            padding: 12px 25px;
+            font-size: 18px;
+            border-radius: 8px;
+            margin-top: 15px;
+            box-shadow: 0 0 15px rgba(255, 0, 0, 0.5);
+            animation: buttonPulse 3s infinite;
+        }
+        @keyframes buttonPulse {
+            0% { box-shadow: 0 0 15px rgba(255, 0, 0, 0.5); }
+            50% { box-shadow: 0 0 25px rgba(255, 0, 0, 0.8); }
+            100% { box-shadow: 0 0 15px rgba(255, 0, 0, 0.5); }
+        }
+        #startButton:hover {
+            background-color: #ff0000;
+            transform: scale(1.1);
+            box-shadow: 0 0 20px rgba(255, 0, 0, 1);
+        }
+        #startScreenOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 89;
+            display: block;
+        }
+        .game-ui {
+            display: none; /* Hide all game UI elements initially */
         }
     </style>
 </head>
 <body>
     <div id="crosshair">+</div>
-    <div id="pauseMenu">
+    
+    <div id="startScreenOverlay"></div>
+    
+    <div id="startScreen" class="game-menu">
+        <h1 class="game-title">ZOMBIE SURVIVAL</h1>
+        <p class="game-description">Survive waves of zombies in this first-person shooter. Collect weapons, manage ammo, and stay alive!</p>
+        
+        <div class="controls-info">
+            <div><span class="key">W,A,S,D</span> <span>Movement</span></div>
+            <div><span class="key">Mouse</span> <span>Look around</span></div>
+            <div><span class="key">Left Click</span> <span>Shoot</span></div>
+            <div><span class="key">R</span> <span>Reload</span></div>
+            <div><span class="key">P</span> <span>Pause game</span></div>
+        </div>
+        
+        <button id="startButton">START GAME</button>
+    </div>
+    
+    <div id="pauseMenu" class="game-menu">
         <h2>GAME PAUSED</h2>
         <p>Press P to resume the game</p>
         <button id="resumeButton">RESUME</button>
         <button id="restartButton">RESTART</button>
     </div>
+    
     <script type="importmap">
         {
             "imports": {
@@ -77,6 +199,6 @@
             }
         }
     </script>
-    <script type="module" src="js/main.js?v=23"></script>
+    <script type="module" src="js/main.js?v=24"></script>
 </body>
 </html> 

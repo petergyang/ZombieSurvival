@@ -27,7 +27,7 @@ export const WEAPONS = {
 
 export const WAVE_SYSTEM = {
     MAX_WAVES: 5,
-    ZOMBIES_PER_WAVE: [6, 10, 14, 20, 1],
+    ZOMBIES_PER_WAVE: [6, 10, 14, 20, 31],
     TRANSITION_DURATION: 0
 };
 
@@ -41,14 +41,14 @@ export const ZOMBIE = {
     SPEED: 0.03,
     SPAWN_INTERVAL: 5000,
     MAX_ZOMBIES: 20,
-    DETECTION_RANGE: 30,
+    DETECTION_RANGE: Infinity,
     REGULAR: {
         HEALTH: 100,
         DAMAGE: 10,
         ATTACK_RANGE: 2
     },
     BOSS: {
-        HEALTH: 200,
+        HEALTH: 2000,
         DAMAGE: 30,
         ATTACK_RANGE: 8,
         SCALE: 10
