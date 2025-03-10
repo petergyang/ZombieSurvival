@@ -128,73 +128,56 @@ export class Zombie {
         tornPatch.position.set(Math.random() > 0.5 ? 0.3 : -0.3, 0.2 * scale, 0.26 * scale);
         torso.add(tornPatch);
         
-        // ARMS - Low poly style
-        // Upper arms
-        const upperArmGeometry = new THREE.BoxGeometry(
-            0.25 * scale, 
-            0.6 * scale, 
-            0.25 * scale
-        );
+        // ARMS - Classic zombie pose with arms stretched out in front
+        
+        // Left arm - one piece stretched straight out
+        const leftArmGeometry = new THREE.BoxGeometry(0.2 * scale, 0.2 * scale, 1.2 * scale);
         const armMaterial = new THREE.MeshStandardMaterial({ color: skinColor });
+        const leftArm = new THREE.Mesh(leftArmGeometry, armMaterial);
+        // Position at shoulder and extend forward
+        leftArm.position.set(-0.45 * scale, 1.1 * scale, 0.6 * scale);
+        leftArm.name = 'leftArm';
+        zombie.add(leftArm);
         
-        // Left arm (upper + lower)
-        const leftUpperArm = new THREE.Mesh(upperArmGeometry, armMaterial);
-        leftUpperArm.position.set(-0.6 * scale, 1.1 * scale, 0);
-        leftUpperArm.rotation.z = Math.PI / 12; // Slight outward angle
-        leftUpperArm.castShadow = true;
-        leftUpperArm.name = 'leftUpperArm';
-        zombie.add(leftUpperArm);
-        
-        // Shirt sleeve
-        const sleeveGeometry = new THREE.BoxGeometry(0.3 * scale, 0.3 * scale, 0.3 * scale);
-        const leftSleeve = new THREE.Mesh(sleeveGeometry, torsoMaterial);
-        leftSleeve.position.set(0, 0.2 * scale, 0);
-        leftUpperArm.add(leftSleeve);
-        
-        // Lower left arm
-        const lowerArmGeometry = new THREE.BoxGeometry(
-            0.22 * scale, 
-            0.6 * scale, 
-            0.22 * scale
-        );
-        const leftLowerArm = new THREE.Mesh(lowerArmGeometry, armMaterial);
-        leftLowerArm.position.set(0, -0.6 * scale, 0);
-        leftLowerArm.rotation.x = 0.4; // Bend at elbow
-        leftLowerArm.name = 'leftLowerArm';
-        leftUpperArm.add(leftLowerArm);
-        
-        // Left hand
+        // Left hand at end of arm
         const handGeometry = new THREE.BoxGeometry(0.25 * scale, 0.25 * scale, 0.25 * scale);
         const leftHand = new THREE.Mesh(handGeometry, armMaterial);
-        leftHand.position.set(0, -0.4 * scale, 0);
+        leftHand.position.set(0, 0, 0.6 * scale);
+        leftHand.rotation.x = -0.3; // Slight downward angle
         leftHand.name = 'leftHand';
-        leftLowerArm.add(leftHand);
+        leftArm.add(leftHand);
         
-        // Right arm (upper + lower) - mirror of left
-        const rightUpperArm = new THREE.Mesh(upperArmGeometry, armMaterial);
-        rightUpperArm.position.set(0.6 * scale, 1.1 * scale, 0);
-        rightUpperArm.rotation.z = -Math.PI / 12; // Slight outward angle
-        rightUpperArm.castShadow = true;
-        rightUpperArm.name = 'rightUpperArm';
-        zombie.add(rightUpperArm);
+        // Add simple fingers to left hand
+        const fingerGeometry = new THREE.BoxGeometry(0.05 * scale, 0.15 * scale, 0.05 * scale);
+        for (let i = 0; i < 3; i++) {
+            const finger = new THREE.Mesh(fingerGeometry, armMaterial);
+            finger.position.set((i - 1) * 0.07 * scale, -0.1 * scale, 0.05 * scale);
+            finger.rotation.x = -0.3; // Curl fingers
+            leftHand.add(finger);
+        }
         
-        // Shirt sleeve
-        const rightSleeve = new THREE.Mesh(sleeveGeometry, torsoMaterial);
-        rightSleeve.position.set(0, 0.2 * scale, 0);
-        rightUpperArm.add(rightSleeve);
+        // Right arm - one piece stretched straight out
+        const rightArmGeometry = new THREE.BoxGeometry(0.2 * scale, 0.2 * scale, 1.2 * scale);
+        const rightArm = new THREE.Mesh(rightArmGeometry, armMaterial);
+        // Position at shoulder and extend forward
+        rightArm.position.set(0.45 * scale, 1.1 * scale, 0.6 * scale);
+        rightArm.name = 'rightArm';
+        zombie.add(rightArm);
         
-        // Lower right arm
-        const rightLowerArm = new THREE.Mesh(lowerArmGeometry, armMaterial);
-        rightLowerArm.position.set(0, -0.6 * scale, 0);
-        rightLowerArm.rotation.x = 0.4; // Bend at elbow
-        rightLowerArm.name = 'rightLowerArm';
-        rightUpperArm.add(rightLowerArm);
-        
-        // Right hand
+        // Right hand at end of arm
         const rightHand = new THREE.Mesh(handGeometry, armMaterial);
-        rightHand.position.set(0, -0.4 * scale, 0);
+        rightHand.position.set(0, 0, 0.6 * scale);
+        rightHand.rotation.x = -0.3; // Slight downward angle
         rightHand.name = 'rightHand';
-        rightLowerArm.add(rightHand);
+        rightArm.add(rightHand);
+        
+        // Add simple fingers to right hand
+        for (let i = 0; i < 3; i++) {
+            const finger = new THREE.Mesh(fingerGeometry, armMaterial);
+            finger.position.set((i - 1) * 0.07 * scale, -0.1 * scale, 0.05 * scale);
+            finger.rotation.x = -0.3; // Curl fingers
+            rightHand.add(finger);
+        }
         
         // LEGS - Low poly style
         // Pants
@@ -337,12 +320,23 @@ export class Zombie {
             
             // Find limbs by traversing the mesh hierarchy
             this.mesh.traverse((child) => {
-                // Animate arms - more exaggerated zombie-like swinging
-                if (child.name === 'leftUpperArm') {
-                    child.rotation.x = Math.sin(walkCycle) * 0.5;
+                // Animate arms - simple up/down swaying
+                if (child.name === 'leftArm') {
+                    // Add slight up/down motion
+                    child.rotation.x = Math.sin(walkCycle) * 0.1;
+                    // Add slight side-to-side swaying
+                    child.rotation.z = Math.sin(walkCycle * 0.7) * 0.1;
                 }
-                else if (child.name === 'rightUpperArm') {
-                    child.rotation.x = Math.sin(walkCycle + Math.PI) * 0.5; // Opposite phase
+                else if (child.name === 'rightArm') {
+                    // Add slight up/down motion (opposite phase)
+                    child.rotation.x = Math.sin(walkCycle + Math.PI) * 0.1;
+                    // Add slight side-to-side swaying (opposite phase)
+                    child.rotation.z = Math.sin(walkCycle * 0.7 + Math.PI) * 0.1;
+                }
+                // Animate hands for grasping motion
+                else if (child.name === 'leftHand' || child.name === 'rightHand') {
+                    // Make hands open and close slightly
+                    child.rotation.x = -0.3 + Math.sin(walkCycle * 0.5) * 0.2;
                 }
                 // Animate legs - shambling gait
                 else if (child.name === 'leftUpperLeg') {
