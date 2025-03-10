@@ -2,9 +2,10 @@ import * as THREE from 'three';
 
 // Scene setup
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x001a33); // Dark night sky
-// Add fog to the scene
-scene.fog = new THREE.FogExp2(0x001a33, 0.015); // Exponential fog with same color as background
+// Comment out the background color to allow the skybox to be visible
+// scene.background = new THREE.Color(0x001a33); // Dark night sky
+// Remove fog to improve visibility of stars and moon
+// scene.fog = new THREE.FogExp2(0x001a33, 0.008); // Reduced fog density from 0.015 to 0.008
 
 // Camera setup
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -14,6 +15,107 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
+// Create skybox with stars and moon
+function createSkybox() {
+    // Create a large sphere for the skybox
+    const skyboxRadius = 500;
+    const skyboxGeometry = new THREE.SphereGeometry(skyboxRadius, 32, 32);
+    const skyboxMaterial = new THREE.MeshBasicMaterial({
+        color: 0x000000, // Pure black
+        side: THREE.BackSide // Render on the inside of the sphere
+    });
+    
+    const skybox = new THREE.Mesh(skyboxGeometry, skyboxMaterial);
+    scene.add(skybox);
+    
+    // Create stars
+    const starsCount = 2000;
+    const starsGeometry = new THREE.BufferGeometry();
+    const starPositions = [];
+    
+    for (let i = 0; i < starsCount; i++) {
+        // Generate random positions on the sphere
+        const theta = Math.random() * Math.PI * 2; // Azimuthal angle
+        const phi = Math.acos(2 * Math.random() - 1); // Polar angle
+        const radius = skyboxRadius * 0.9; // Slightly smaller than skybox
+        
+        const x = radius * Math.sin(phi) * Math.cos(theta);
+        const y = radius * Math.sin(phi) * Math.sin(theta);
+        const z = radius * Math.cos(phi);
+        
+        starPositions.push(x, y, z);
+    }
+    
+    starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starPositions, 3));
+    
+    // Create star material with custom shader
+    const starsMaterial = new THREE.PointsMaterial({
+        color: 0xffffff, // Pure white
+        size: 2.0, // Fixed size for all stars
+        transparent: true,
+        opacity: 1.0,
+        sizeAttenuation: true,
+        depthWrite: true, // Enable depth writing so stars are occluded by objects
+        depthTest: true // Enable depth testing so stars aren't visible through objects
+    });
+    
+    const stars = new THREE.Points(starsGeometry, starsMaterial);
+    scene.add(stars);
+    
+    // Create moon
+    const moonRadius = 15;
+    const moonGeometry = new THREE.SphereGeometry(moonRadius, 32, 32);
+    const moonMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffffdd // Slightly warmer white
+    });
+    
+    const moon = new THREE.Mesh(moonGeometry, moonMaterial);
+    
+    // Position the moon in the sky
+    const moonDistance = skyboxRadius * 0.9;
+    moon.position.set(
+        moonDistance * 0.5,  // x
+        moonDistance * 0.7,  // y - higher in the sky
+        -moonDistance * 0.3  // z - slightly in front
+    );
+    
+    scene.add(moon);
+    
+    // Create a stronger glow around the moon
+    const moonGlowGeometry = new THREE.SphereGeometry(moonRadius * 1.8, 32, 32); // Increased from 1.5 to 1.8
+    const moonGlowMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffffee,
+        transparent: true,
+        opacity: 0.6, // Increased from 0.4 to 0.6
+        side: THREE.BackSide
+    });
+    
+    const moonGlow = new THREE.Mesh(moonGlowGeometry, moonGlowMaterial);
+    moon.add(moonGlow);
+    
+    // Add a second, larger glow for more light spread
+    const moonOuterGlowGeometry = new THREE.SphereGeometry(moonRadius * 3.0, 32, 32);
+    const moonOuterGlowMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffffee,
+        transparent: true,
+        opacity: 0.3,
+        side: THREE.BackSide
+    });
+    
+    const moonOuterGlow = new THREE.Mesh(moonOuterGlowGeometry, moonOuterGlowMaterial);
+    moon.add(moonOuterGlow);
+    
+    // Return skybox elements for later reference
+    return {
+        skybox: skybox,
+        stars: stars,
+        moon: moon
+    };
+}
+
+// Create the skybox and celestial objects
+const skyboxElements = createSkybox();
+
 // First-person controls
 const moveSpeed = 0.1;
 const mouseSensitivity = 0.002;
@@ -21,12 +123,11 @@ const playerHeight = 2;
 
 // Player state
 const player = {
-    position: new THREE.Vector3(0, playerHeight, 5),
+    position: new THREE.Vector3(0, 1.7, 0),
     rotation: {
         horizontal: 0,
         vertical: 0
     },
-    velocity: new THREE.Vector3(),
     onGround: true,
     isShooting: false,
     lastShootTime: 0,
@@ -43,6 +144,11 @@ const player = {
     shotgunAmmo: 0,
     machinegunAmmo: 0
 };
+
+// Collision system for buildings
+const collisionBoundaries = [];
+const playerCollisionRadius = 0.5; // Player collision radius
+const zombieCollisionRadius = 0.8; // Zombie collision radius
 
 // Input state
 const keys = {
@@ -359,11 +465,35 @@ function createWeaponPickup(type, x, z) {
 }
 
 // Add flashlight to camera
-const flashlight = new THREE.SpotLight(0xffffff, 1, 15, Math.PI / 6, 0.5, 1);
-flashlight.position.set(0, 0, 0);
-camera.add(flashlight);
-flashlight.target.position.set(0, 0, -1);
-camera.add(flashlight.target);
+const flashlight = new THREE.SpotLight(0xffffee, 10, 50, Math.PI / 8, 0.3, 1);
+// Position the flashlight at the camera position (not attached to camera)
+flashlight.position.copy(camera.position);
+scene.add(flashlight);
+// Create a target object for the flashlight
+const flashlightTarget = new THREE.Object3D();
+scene.add(flashlightTarget);
+flashlight.target = flashlightTarget;
+
+// Create a raycaster for flashlight distance detection
+const flashlightRaycaster = new THREE.Raycaster();
+// Default angle values for the flashlight
+const flashlightMinAngle = Math.PI / 32; // Much narrower beam for far objects (5.625 degrees)
+const flashlightMaxAngle = Math.PI / 4;  // Wider beam for close objects (45 degrees)
+const flashlightMinDistance = 1.5;       // Distance at which beam is widest
+const flashlightMaxDistance = 30;        // Distance at which beam is narrowest
+
+// Enable shadows for the flashlight
+flashlight.castShadow = true;
+flashlight.shadow.mapSize.width = 1024;
+flashlight.shadow.mapSize.height = 1024;
+flashlight.shadow.camera.near = 0.5;
+flashlight.shadow.camera.far = 30;
+flashlight.shadow.bias = -0.0001;
+
+// Add a subtle point light at the player position for better visibility
+const playerLight = new THREE.PointLight(0xffffee, 0.5, 5);
+playerLight.position.set(0, 0, 0);
+camera.add(playerLight);
 
 // Add gun to camera
 let gun = createPistol();
@@ -463,59 +593,125 @@ function createTree(x, z) {
     return tree;
 }
 
+// Helper function to create a window light
+function createWindowLight(position, color = 0xffffaa, intensity = 0.5, distance = 3) {
+    const light = new THREE.PointLight(color, intensity, distance);
+    light.position.copy(position);
+    return light;
+}
+
 // Function to create a house
 function createHouse(x, z) {
     const house = new THREE.Group();
     
-    // Main house body
-    const wallsGeometry = new THREE.BoxGeometry(8, 6, 10);
-    const wallsMaterial = new THREE.MeshStandardMaterial({ color: 0xd4b995 });
-    const walls = new THREE.Mesh(wallsGeometry, wallsMaterial);
-    walls.castShadow = true;
-    walls.receiveShadow = true;
-    house.add(walls);
+    // Main structure
+    const baseGeometry = new THREE.BoxGeometry(10, 5, 8);
+    const baseMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0xA0522D, // Brown
+        roughness: 0.7
+    });
+    const base = new THREE.Mesh(baseGeometry, baseMaterial);
+    base.castShadow = true;
+    base.receiveShadow = true;
+    house.add(base);
     
     // Roof
-    const roofGeometry = new THREE.ConeGeometry(7, 4, 4);
-    const roofMaterial = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
+    const roofGeometry = new THREE.ConeGeometry(7.5, 4, 4);
+    const roofMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x8B4513, // Darker brown
+        roughness: 0.9
+    });
     const roof = new THREE.Mesh(roofGeometry, roofMaterial);
-    roof.position.y = 5;
-    roof.rotation.y = Math.PI / 4;
+    roof.position.y = 4.5;
+    roof.rotation.y = Math.PI / 4; // Rotate 45 degrees
     roof.castShadow = true;
-    roof.receiveShadow = true;
     house.add(roof);
     
     // Door
     const doorGeometry = new THREE.BoxGeometry(1.5, 3, 0.2);
-    const doorMaterial = new THREE.MeshStandardMaterial({ color: 0x4a2f1b });
+    const doorMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x8B4513, // Dark brown
+        roughness: 0.8
+    });
     const door = new THREE.Mesh(doorGeometry, doorMaterial);
-    door.position.set(0, -1.5, 5);
+    door.position.set(0, -1, 4.1);
     house.add(door);
     
     // Windows
-    const windowGeometry = new THREE.BoxGeometry(1.5, 1.5, 0.2);
-    const windowMaterial = new THREE.MeshStandardMaterial({ color: 0x88c1ff });
+    const windowGeometry = new THREE.BoxGeometry(1.5, 1.5, 0.1);
+    const windowMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0xffff99,
+        emissive: 0x666633,
+        emissiveIntensity: 1.0 // Changed from 5.0 to 1.0 for more subtle glow
+    });
     
-    const window1 = new THREE.Mesh(windowGeometry, windowMaterial);
-    window1.position.set(-2, 0, 5);
-    house.add(window1);
+    // Front windows
+    const frontWindow1 = new THREE.Mesh(windowGeometry, windowMaterial);
+    frontWindow1.position.set(-3, 1, 4.1);
+    house.add(frontWindow1);
     
-    const window2 = new THREE.Mesh(windowGeometry, windowMaterial);
-    window2.position.set(2, 0, 5);
-    house.add(window2);
+    // Add light inside front window 1
+    const frontWindowLight1 = createWindowLight(
+        new THREE.Vector3(-3, 1, 3.5), // Position light inside the window
+        0xffffaa, // Warm yellow light
+        0.5,      // Low intensity
+        3         // Short distance
+    );
+    house.add(frontWindowLight1);
     
-    // Add windows to the sides
-    const sideWindow1 = window1.clone();
-    sideWindow1.position.set(4, 0, 0);
+    const frontWindow2 = new THREE.Mesh(windowGeometry, windowMaterial);
+    frontWindow2.position.set(3, 1, 4.1);
+    house.add(frontWindow2);
+    
+    // Add light inside front window 2
+    const frontWindowLight2 = createWindowLight(
+        new THREE.Vector3(3, 1, 3.5),
+        0xffffaa,
+        0.5,
+        3
+    );
+    house.add(frontWindowLight2);
+    
+    // Side windows
+    const sideWindow1 = new THREE.Mesh(windowGeometry, windowMaterial);
+    sideWindow1.position.set(-5.1, 1, 0);
     sideWindow1.rotation.y = Math.PI / 2;
     house.add(sideWindow1);
     
-    const sideWindow2 = window1.clone();
-    sideWindow2.position.set(-4, 0, 0);
+    // Add light inside side window 1
+    const sideWindowLight1 = createWindowLight(
+        new THREE.Vector3(-4.5, 1, 0),
+        0xffffaa,
+        0.5,
+        3
+    );
+    house.add(sideWindowLight1);
+    
+    const sideWindow2 = new THREE.Mesh(windowGeometry, windowMaterial);
+    sideWindow2.position.set(5.1, 1, 0);
     sideWindow2.rotation.y = Math.PI / 2;
     house.add(sideWindow2);
     
-    house.position.set(x, 3, z);
+    // Add light inside side window 2
+    const sideWindowLight2 = createWindowLight(
+        new THREE.Vector3(4.5, 1, 0),
+        0xffffaa,
+        0.5,
+        3
+    );
+    house.add(sideWindowLight2);
+    
+    house.position.set(x, 2.5, z);
+    
+    // Add collision boundary
+    collisionBoundaries.push({
+        type: 'house',
+        minX: x - 5,
+        maxX: x + 5,
+        minZ: z - 4,
+        maxZ: z + 4
+    });
+    
     return house;
 }
 
@@ -523,44 +719,85 @@ function createHouse(x, z) {
 function createCottage(x, z) {
     const cottage = new THREE.Group();
     
-    // Main cottage body
-    const wallsGeometry = new THREE.BoxGeometry(6, 4, 7);
-    const wallsMaterial = new THREE.MeshStandardMaterial({ color: 0xc8a887 });
-    const walls = new THREE.Mesh(wallsGeometry, wallsMaterial);
-    walls.castShadow = true;
-    walls.receiveShadow = true;
-    cottage.add(walls);
+    // Main structure
+    const baseGeometry = new THREE.BoxGeometry(8, 4, 6);
+    const baseMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0xE5DCC7, // Light tan
+        roughness: 0.7
+    });
+    const base = new THREE.Mesh(baseGeometry, baseMaterial);
+    base.castShadow = true;
+    base.receiveShadow = true;
+    cottage.add(base);
     
     // Roof
-    const roofGeometry = new THREE.ConeGeometry(5, 3, 4);
-    const roofMaterial = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
+    const roofGeometry = new THREE.ConeGeometry(6, 3, 4);
+    const roofMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x8B4513, // Dark brown
+        roughness: 0.9
+    });
     const roof = new THREE.Mesh(roofGeometry, roofMaterial);
     roof.position.y = 3.5;
-    roof.rotation.y = Math.PI / 4;
+    roof.rotation.y = Math.PI / 4; // Rotate 45 degrees
     roof.castShadow = true;
-    roof.receiveShadow = true;
     cottage.add(roof);
     
     // Door
     const doorGeometry = new THREE.BoxGeometry(1.2, 2.5, 0.2);
-    const doorMaterial = new THREE.MeshStandardMaterial({ color: 0x4a2f1b });
+    const doorMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x8B4513, // Dark brown
+        roughness: 0.8
+    });
     const door = new THREE.Mesh(doorGeometry, doorMaterial);
-    door.position.set(0, -0.75, 3.5);
+    door.position.set(0, -0.75, 3.1);
     cottage.add(door);
     
     // Windows
-    const windowGeometry = new THREE.BoxGeometry(1.2, 1.2, 0.2);
-    const windowMaterial = new THREE.MeshStandardMaterial({ color: 0x88c1ff });
+    const windowGeometry = new THREE.BoxGeometry(1.2, 1.2, 0.1);
+    const windowMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0xffff99,
+        emissive: 0x666633,
+        emissiveIntensity: 1.0 // Changed from 5.0 to 1.0 for more subtle glow
+    });
     
-    const window1 = new THREE.Mesh(windowGeometry, windowMaterial);
-    window1.position.set(-1.5, 0, 3.5);
-    cottage.add(window1);
+    // Front windows
+    const frontWindow1 = new THREE.Mesh(windowGeometry, windowMaterial);
+    frontWindow1.position.set(-2, 0.5, 3.1);
+    cottage.add(frontWindow1);
     
-    const window2 = new THREE.Mesh(windowGeometry, windowMaterial);
-    window2.position.set(1.5, 0, 3.5);
-    cottage.add(window2);
+    // Add light inside front window 1
+    const frontWindowLight1 = createWindowLight(
+        new THREE.Vector3(-2, 0.5, 2.5),
+        0xffffaa,
+        0.5,
+        3
+    );
+    cottage.add(frontWindowLight1);
+    
+    const frontWindow2 = new THREE.Mesh(windowGeometry, windowMaterial);
+    frontWindow2.position.set(2, 0.5, 3.1);
+    cottage.add(frontWindow2);
+    
+    // Add light inside front window 2
+    const frontWindowLight2 = createWindowLight(
+        new THREE.Vector3(2, 0.5, 2.5),
+        0xffffaa,
+        0.5,
+        3
+    );
+    cottage.add(frontWindowLight2);
     
     cottage.position.set(x, 2, z);
+    
+    // Add collision boundary
+    collisionBoundaries.push({
+        type: 'cottage',
+        minX: x - 4,
+        maxX: x + 4,
+        minZ: z - 3,
+        maxZ: z + 3
+    });
+    
     return cottage;
 }
 
@@ -568,32 +805,51 @@ function createCottage(x, z) {
 function createBarn(x, z) {
     const barn = new THREE.Group();
     
-    // Main barn body
-    const wallsGeometry = new THREE.BoxGeometry(10, 8, 12);
-    const wallsMaterial = new THREE.MeshStandardMaterial({ color: 0xa52a2a });
-    const walls = new THREE.Mesh(wallsGeometry, wallsMaterial);
-    walls.castShadow = true;
-    walls.receiveShadow = true;
-    barn.add(walls);
+    // Main structure
+    const baseGeometry = new THREE.BoxGeometry(12, 8, 10);
+    const baseMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0xA52A2A, // Red-brown
+        roughness: 0.7
+    });
+    const base = new THREE.Mesh(baseGeometry, baseMaterial);
+    base.castShadow = true;
+    base.receiveShadow = true;
+    barn.add(base);
     
     // Roof
-    const roofGeometry = new THREE.ConeGeometry(8, 5, 4);
-    const roofMaterial = new THREE.MeshStandardMaterial({ color: 0x654321 });
+    const roofGeometry = new THREE.CylinderGeometry(0.1, 6, 4, 4, 1, false, 0, Math.PI);
+    const roofMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x8B4513, // Dark brown
+        roughness: 0.9
+    });
     const roof = new THREE.Mesh(roofGeometry, roofMaterial);
-    roof.position.y = 6.5;
-    roof.rotation.y = Math.PI / 4;
+    roof.position.y = 6;
+    roof.rotation.x = Math.PI / 2;
+    roof.rotation.y = Math.PI / 4; // Rotate 45 degrees
     roof.castShadow = true;
-    roof.receiveShadow = true;
     barn.add(roof);
     
     // Door
     const doorGeometry = new THREE.BoxGeometry(4, 6, 0.2);
-    const doorMaterial = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
+    const doorMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x8B4513, // Dark brown
+        roughness: 0.8
+    });
     const door = new THREE.Mesh(doorGeometry, doorMaterial);
-    door.position.set(0, -1, 6);
+    door.position.set(0, -1, 5.1);
     barn.add(door);
     
     barn.position.set(x, 4, z);
+    
+    // Add collision boundary
+    collisionBoundaries.push({
+        type: 'barn',
+        minX: x - 6,
+        maxX: x + 6,
+        minZ: z - 5,
+        maxZ: z + 5
+    });
+    
     return barn;
 }
 
@@ -761,23 +1017,54 @@ function createBuilding(x, z, width, height, depth) {
     const windowGeometry = new THREE.BoxGeometry(windowSize, windowSize, 0.1);
     const windowMaterial = new THREE.MeshStandardMaterial({ 
         color: 0xffff99,
-        emissive: 0x666633
+        emissive: 0x666633,
+        emissiveIntensity: 1.0 // Changed from 5.0 to 1.0 for more subtle glow
     });
     
     // Create a grid of windows
     for (let y = 1; y < height - 1; y += 2) {
         for (let x = -width/3; x <= width/3; x += 2) {
+            // Front window
             const window = new THREE.Mesh(windowGeometry, windowMaterial);
             window.position.set(x, y, depth/2 + 0.1);
             building.add(window);
             
+            // Add light inside front window
+            const windowLight = createWindowLight(
+                new THREE.Vector3(x, y, depth/2 - 0.5),
+                0xffffaa,
+                0.5,
+                3
+            );
+            building.add(windowLight);
+            
+            // Back window
             const windowBack = window.clone();
             windowBack.position.z = -depth/2 - 0.1;
             building.add(windowBack);
+            
+            // Add light inside back window
+            const windowBackLight = createWindowLight(
+                new THREE.Vector3(x, y, -depth/2 + 0.5),
+                0xffffaa,
+                0.5,
+                3
+            );
+            building.add(windowBackLight);
         }
     }
     
     building.position.set(x, height/2, z);
+    
+    // Add collision boundary
+    collisionBoundaries.push({
+        type: 'building',
+        minX: x - width/2,
+        maxX: x + width/2,
+        minZ: z - depth/2,
+        maxZ: z + depth/2
+    });
+    
     return building;
 }
 
@@ -1085,9 +1372,65 @@ function updateMovement() {
         const rotatedDirection = direction.clone();
         rotatedDirection.applyAxisAngle(new THREE.Vector3(0, 1, 0), player.rotation.horizontal);
         
-        // Update player position
-        player.position.x += rotatedDirection.x * moveSpeed;
-        player.position.z += rotatedDirection.z * moveSpeed;
+        // Calculate intended position
+        const newX = player.position.x + rotatedDirection.x * moveSpeed;
+        const newZ = player.position.z + rotatedDirection.z * moveSpeed;
+        
+        // Check for collisions with buildings
+        let canMove = true;
+        for (const boundary of collisionBoundaries) {
+            // Add a small buffer around the player (playerCollisionRadius)
+            if (newX + playerCollisionRadius > boundary.minX && 
+                newX - playerCollisionRadius < boundary.maxX && 
+                newZ + playerCollisionRadius > boundary.minZ && 
+                newZ - playerCollisionRadius < boundary.maxZ) {
+                canMove = false;
+                break;
+            }
+        }
+        
+        // Only move if no collision
+        if (canMove) {
+            player.position.x = newX;
+            player.position.z = newZ;
+        } else {
+            // Try to slide along walls by checking X and Z movement separately
+            // Try X movement only
+            const newXOnly = player.position.x + rotatedDirection.x * moveSpeed;
+            let canMoveX = true;
+            
+            for (const boundary of collisionBoundaries) {
+                if (newXOnly + playerCollisionRadius > boundary.minX && 
+                    newXOnly - playerCollisionRadius < boundary.maxX && 
+                    player.position.z + playerCollisionRadius > boundary.minZ && 
+                    player.position.z - playerCollisionRadius < boundary.maxZ) {
+                    canMoveX = false;
+                    break;
+                }
+            }
+            
+            if (canMoveX) {
+                player.position.x = newXOnly;
+            }
+            
+            // Try Z movement only
+            const newZOnly = player.position.z + rotatedDirection.z * moveSpeed;
+            let canMoveZ = true;
+            
+            for (const boundary of collisionBoundaries) {
+                if (player.position.x + playerCollisionRadius > boundary.minX && 
+                    player.position.x - playerCollisionRadius < boundary.maxX && 
+                    newZOnly + playerCollisionRadius > boundary.minZ && 
+                    newZOnly - playerCollisionRadius < boundary.maxZ) {
+                    canMoveZ = false;
+                    break;
+                }
+            }
+            
+            if (canMoveZ) {
+                player.position.z = newZOnly;
+            }
+        }
     }
     
     // Update camera position
@@ -1303,12 +1646,42 @@ function spawnWaveZombies() {
         
         // For the boss wave, spawn a single boss
         if (waveSystem.currentWave === 5) {
-            const angle = Math.random() * Math.PI * 2;
-            const distance = 30; // Spawn boss closer (was 40)
-            const x = player.position.x + Math.cos(angle) * distance;
-            const z = player.position.z + Math.sin(angle) * distance;
+            // Find a valid spawn position for the boss
+            let validPosition = false;
+            let x, z;
+            let attempts = 0;
             
-            createZombie(x, z, true); // Create boss zombie
+            while (!validPosition && attempts < 50) {
+                attempts++;
+                const angle = Math.random() * Math.PI * 2;
+                const distance = 30 + Math.random() * 10; // Spawn boss between 30-40 units away
+                x = player.position.x + Math.cos(angle) * distance;
+                z = player.position.z + Math.sin(angle) * distance;
+                
+                // Check if position is valid (not inside a building)
+                validPosition = true;
+                for (const boundary of collisionBoundaries) {
+                    if (x + zombieCollisionRadius > boundary.minX && 
+                        x - zombieCollisionRadius < boundary.maxX && 
+                        z + zombieCollisionRadius > boundary.minZ && 
+                        z - zombieCollisionRadius < boundary.maxZ) {
+                        validPosition = false;
+                        break;
+                    }
+                }
+            }
+            
+            // If we found a valid position, create the boss
+            if (validPosition) {
+                createZombie(x, z, true); // Create boss zombie
+            } else {
+                // Fallback: spawn boss at a fixed distance in a random direction
+                const angle = Math.random() * Math.PI * 2;
+                const distance = 50; // Spawn far away to avoid buildings
+                x = player.position.x + Math.cos(angle) * distance;
+                z = player.position.z + Math.sin(angle) * distance;
+                createZombie(x, z, true);
+            }
         } else {
             // For regular waves, spawn zombies in groups
             const zombiesToSpawn = waveSystem.zombiesPerWave[waveSystem.currentWave - 1];
@@ -1317,13 +1690,48 @@ function spawnWaveZombies() {
             const spawnPoints = [];
             const numSpawnPoints = Math.min(4, Math.ceil(zombiesToSpawn / 3));
             
+            // Find valid spawn points (not inside buildings)
             for (let i = 0; i < numSpawnPoints; i++) {
-                const angle = (i / numSpawnPoints) * Math.PI * 2;
-                const distance = 20 + Math.random() * 10;
-                spawnPoints.push({
-                    x: player.position.x + Math.cos(angle) * distance,
-                    z: player.position.z + Math.sin(angle) * distance
-                });
+                let validPosition = false;
+                let spawnPoint;
+                let attempts = 0;
+                
+                while (!validPosition && attempts < 30) {
+                    attempts++;
+                    const angle = (i / numSpawnPoints) * Math.PI * 2 + (Math.random() * 0.5);
+                    const distance = 20 + Math.random() * 15; // 20-35 units away
+                    const x = player.position.x + Math.cos(angle) * distance;
+                    const z = player.position.z + Math.sin(angle) * distance;
+                    
+                    // Check if position is valid (not inside a building)
+                    validPosition = true;
+                    for (const boundary of collisionBoundaries) {
+                        if (x + zombieCollisionRadius > boundary.minX && 
+                            x - zombieCollisionRadius < boundary.maxX && 
+                            z + zombieCollisionRadius > boundary.minZ && 
+                            z - zombieCollisionRadius < boundary.maxZ) {
+                            validPosition = false;
+                            break;
+                        }
+                    }
+                    
+                    if (validPosition) {
+                        spawnPoint = { x, z };
+                    }
+                }
+                
+                // If we found a valid spawn point, add it
+                if (spawnPoint) {
+                    spawnPoints.push(spawnPoint);
+                } else {
+                    // Fallback: use a point far away from buildings
+                    const angle = (i / numSpawnPoints) * Math.PI * 2;
+                    const distance = 45; // Far enough to likely avoid buildings
+                    spawnPoints.push({
+                        x: player.position.x + Math.cos(angle) * distance,
+                        z: player.position.z + Math.sin(angle) * distance
+                    });
+                }
             }
             
             // Distribute zombies among spawn points
@@ -1332,10 +1740,36 @@ function spawnWaveZombies() {
                 const spawnPoint = spawnPoints[i % spawnPoints.length];
                 
                 // Add some randomness to position (but keep them clustered)
-                const offsetX = (Math.random() - 0.5) * 5; // 5 units spread
-                const offsetZ = (Math.random() - 0.5) * 5;
+                let validPosition = false;
+                let x, z;
+                let attempts = 0;
                 
-                createZombie(spawnPoint.x + offsetX, spawnPoint.z + offsetZ, false);
+                while (!validPosition && attempts < 10) {
+                    attempts++;
+                    const offsetX = (Math.random() - 0.5) * 5; // 5 units spread
+                    const offsetZ = (Math.random() - 0.5) * 5;
+                    x = spawnPoint.x + offsetX;
+                    z = spawnPoint.z + offsetZ;
+                    
+                    // Check if position is valid (not inside a building)
+                    validPosition = true;
+                    for (const boundary of collisionBoundaries) {
+                        if (x + zombieCollisionRadius > boundary.minX && 
+                            x - zombieCollisionRadius < boundary.maxX && 
+                            z + zombieCollisionRadius > boundary.minZ && 
+                            z - zombieCollisionRadius < boundary.maxZ) {
+                            validPosition = false;
+                            break;
+                        }
+                    }
+                }
+                
+                // Create zombie at valid position or at spawn point if no valid position found
+                if (validPosition) {
+                    createZombie(x, z, false);
+                } else {
+                    createZombie(spawnPoint.x, spawnPoint.z, false);
+                }
             }
         }
         
@@ -1521,10 +1955,65 @@ function updateZombies() {
                 player.position.z - zombie.position.z
             ).normalize();
             
-            // Move zombie (boss moves slightly faster now)
-            const speed = zombie.userData.isBoss ? zombieSpeed * 0.9 : zombieSpeed; // Changed from 0.7 to 0.9
-            zombie.position.x += direction.x * speed;
-            zombie.position.z += direction.z * speed;
+            // Calculate intended position
+            const speed = zombie.userData.isBoss ? zombieSpeed * 0.9 : zombieSpeed;
+            const newX = zombie.position.x + direction.x * speed;
+            const newZ = zombie.position.z + direction.z * speed;
+            
+            // Check for collisions with buildings
+            let canMove = true;
+            for (const boundary of collisionBoundaries) {
+                if (newX + zombieCollisionRadius > boundary.minX && 
+                    newX - zombieCollisionRadius < boundary.maxX && 
+                    newZ + zombieCollisionRadius > boundary.minZ && 
+                    newZ - zombieCollisionRadius < boundary.maxZ) {
+                    canMove = false;
+                    break;
+                }
+            }
+            
+            // Only move if no collision
+            if (canMove) {
+                zombie.position.x = newX;
+                zombie.position.z = newZ;
+            } else {
+                // Try to navigate around obstacles by trying different directions
+                // Try moving only in X direction
+                const newXOnly = zombie.position.x + direction.x * speed;
+                let canMoveX = true;
+                
+                for (const boundary of collisionBoundaries) {
+                    if (newXOnly + zombieCollisionRadius > boundary.minX && 
+                        newXOnly - zombieCollisionRadius < boundary.maxX && 
+                        zombie.position.z + zombieCollisionRadius > boundary.minZ && 
+                        zombie.position.z - zombieCollisionRadius < boundary.maxZ) {
+                        canMoveX = false;
+                        break;
+                    }
+                }
+                
+                if (canMoveX) {
+                    zombie.position.x = newXOnly;
+                }
+                
+                // Try moving only in Z direction
+                const newZOnly = zombie.position.z + direction.z * speed;
+                let canMoveZ = true;
+                
+                for (const boundary of collisionBoundaries) {
+                    if (zombie.position.x + zombieCollisionRadius > boundary.minX && 
+                        zombie.position.x - zombieCollisionRadius < boundary.maxX && 
+                        newZOnly + zombieCollisionRadius > boundary.minZ && 
+                        newZOnly - zombieCollisionRadius < boundary.maxZ) {
+                        canMoveZ = false;
+                        break;
+                    }
+                }
+                
+                if (canMoveZ) {
+                    zombie.position.z = newZOnly;
+                }
+            }
             
             // Rotate zombie to face player
             zombie.rotation.y = Math.atan2(direction.x, direction.z);
@@ -1536,8 +2025,26 @@ function updateZombies() {
         } else {
             // Random wandering behavior
             const wanderAngle = now * 0.0005 + i; // Different for each zombie
-            zombie.position.x += Math.sin(wanderAngle) * zombieSpeed * 0.3;
-            zombie.position.z += Math.cos(wanderAngle) * zombieSpeed * 0.3;
+            const newX = zombie.position.x + Math.sin(wanderAngle) * zombieSpeed * 0.3;
+            const newZ = zombie.position.z + Math.cos(wanderAngle) * zombieSpeed * 0.3;
+            
+            // Check for collisions with buildings
+            let canMove = true;
+            for (const boundary of collisionBoundaries) {
+                if (newX + zombieCollisionRadius > boundary.minX && 
+                    newX - zombieCollisionRadius < boundary.maxX && 
+                    newZ + zombieCollisionRadius > boundary.minZ && 
+                    newZ - zombieCollisionRadius < boundary.maxZ) {
+                    canMove = false;
+                    break;
+                }
+            }
+            
+            // Only move if no collision
+            if (canMove) {
+                zombie.position.x = newX;
+                zombie.position.z = newZ;
+            }
         }
     }
 }
@@ -1941,7 +2448,7 @@ function animate() {
     requestAnimationFrame(animate);
     
     // Only update game if not game over and not paused
-    if (!player.isGameOver && !gameState.isPaused) {
+    if (!player.isGameOver && !isPaused) {
         // Full game update
         updateMovement();
         handleShooting();
@@ -1955,12 +2462,58 @@ function animate() {
         checkHotkeys(); // Check for hotkeys
         checkWeaponPickups(); // Check for weapon pickups
         
+        // Update skybox position to follow camera
+        skyboxElements.skybox.position.copy(camera.position);
+        
+        // Keep stars at a fixed position relative to the camera
+        skyboxElements.stars.position.copy(camera.position);
+        
+        // Add very subtle moon rotation for a more dynamic night sky
+        skyboxElements.moon.rotation.y += 0.0001;
+        skyboxElements.moon.position.copy(camera.position);
+        // Maintain moon's relative position in the sky
+        const moonDistance = 450; // Slightly less than skybox radius
+        skyboxElements.moon.position.x += moonDistance * 0.5;
+        skyboxElements.moon.position.y += moonDistance * 0.7;
+        skyboxElements.moon.position.z += -moonDistance * 0.3;
+        
         // Update flashlight position and direction
         flashlight.position.copy(camera.position);
-        const target = new THREE.Vector3(0, 0, -1);
-        target.applyQuaternion(camera.quaternion);
-        target.add(camera.position);
-        flashlight.target.position.copy(target);
+        // Calculate the target position based on where the player is looking
+        const direction = new THREE.Vector3(0, 0, -1);
+        direction.applyQuaternion(camera.quaternion);
+        direction.normalize();
+        
+        // Set the target position 20 units in front of the camera
+        flashlightTarget.position.copy(camera.position).add(direction.multiplyScalar(20));
+        
+        // Cast a ray to find distance to objects in view
+        flashlightRaycaster.set(camera.position, direction);
+        const intersects = flashlightRaycaster.intersectObjects(scene.children, true);
+        
+        // Adjust flashlight angle based on distance to nearest object
+        let distance = flashlightMaxDistance; // Default to max if no hit
+        if (intersects.length > 0) {
+            // Get the distance to the first object hit
+            distance = intersects[0].distance;
+        }
+        
+        // Clamp distance between min and max values
+        distance = Math.max(flashlightMinDistance, Math.min(distance, flashlightMaxDistance));
+        
+        // Calculate angle - exponential relationship with distance for more dramatic effect
+        // As distance increases, angle decreases more rapidly (narrower beam)
+        const t = Math.pow(1 - ((distance - flashlightMinDistance) / (flashlightMaxDistance - flashlightMinDistance)), 2);
+        const angle = flashlightMinAngle + t * (flashlightMaxAngle - flashlightMinAngle);
+        
+        // Update flashlight angle
+        flashlight.angle = angle;
+        
+        // Also adjust the penumbra for more realism - sharper edge for distant objects
+        flashlight.penumbra = 0.2 + (0.4 * t); // 0.2 for far objects, 0.6 for close objects
+        
+        // Update player light position
+        playerLight.position.copy(camera.position);
         
         // Render at full frame rate when playing
         renderer.render(scene, camera);
@@ -1986,4 +2539,74 @@ if (document.readyState === 'loading') {
     initializeGameControls();
 }
 
-animate(); 
+animate();
+
+// Function to handle game over
+function handleGameOver() {
+    // Set game over state
+    player.isGameOver = true;
+    
+    // Release pointer lock
+    managePointerLock(false);
+    
+    // Create game over display
+    const gameOverDisplay = document.createElement('div');
+    gameOverDisplay.style.position = 'absolute';
+    gameOverDisplay.style.top = '50%';
+    gameOverDisplay.style.left = '50%';
+    gameOverDisplay.style.transform = 'translate(-50%, -50%)';
+    gameOverDisplay.style.textAlign = 'center';
+    gameOverDisplay.style.color = '#ff0000';
+    gameOverDisplay.style.fontFamily = 'Arial, sans-serif';
+    gameOverDisplay.style.zIndex = '1000';
+    gameOverDisplay.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+    gameOverDisplay.style.padding = '40px';
+    gameOverDisplay.style.borderRadius = '10px';
+    gameOverDisplay.style.boxShadow = '0 0 20px rgba(255, 0, 0, 0.5)';
+    
+    // Add game over message
+    const gameOverTitle = document.createElement('h1');
+    gameOverTitle.textContent = 'YOU DIED';
+    gameOverTitle.style.fontSize = '48px';
+    gameOverTitle.style.marginBottom = '20px';
+    gameOverTitle.style.textShadow = '0 0 10px #ff0000';
+    gameOverDisplay.appendChild(gameOverTitle);
+    
+    // Add score
+    const scoreText = document.createElement('p');
+    scoreText.textContent = `Final Score: ${player.score}`;
+    scoreText.style.fontSize = '24px';
+    scoreText.style.marginBottom = '30px';
+    gameOverDisplay.appendChild(scoreText);
+    
+    // Add restart button
+    const restartButton = document.createElement('button');
+    restartButton.textContent = 'RESTART';
+    restartButton.style.padding = '15px 30px';
+    restartButton.style.fontSize = '20px';
+    restartButton.style.backgroundColor = '#ff3333';
+    restartButton.style.color = 'white';
+    restartButton.style.border = 'none';
+    restartButton.style.borderRadius = '5px';
+    restartButton.style.cursor = 'pointer';
+    restartButton.style.transition = 'background-color 0.3s';
+    
+    // Hover effect
+    restartButton.onmouseover = function() {
+        this.style.backgroundColor = '#ff6666';
+    };
+    restartButton.onmouseout = function() {
+        this.style.backgroundColor = '#ff3333';
+    };
+    
+    // Add restart functionality
+    restartButton.onclick = function() {
+        restartGame();
+    };
+    
+    gameOverDisplay.appendChild(restartButton);
+    document.body.appendChild(gameOverDisplay);
+    
+    // Play death sound if available
+    // if (soundEffects.death) soundEffects.death.play();
+} 
