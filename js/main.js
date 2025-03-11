@@ -1906,6 +1906,9 @@ function spawnWaveZombies() {
             // Update the wave indicator with the correct count of zombies
             updateWaveIndicator();
             console.log(`Wave ${waveSystem.currentWave} started with ${waveSystem.zombiesRemaining} zombies remaining`);
+            
+            // Sync the zombie counter to ensure it matches the actual number of zombies
+            syncZombieCounter();
         } else {
             // For regular waves, spawn zombies in groups
             const zombiesToSpawn = waveSystem.zombiesPerWave[waveSystem.currentWave - 1];
@@ -2029,6 +2032,9 @@ function spawnWaveZombies() {
             // Update the wave indicator with the correct count of zombies
             updateWaveIndicator();
             console.log(`Wave ${waveSystem.currentWave} started with ${waveSystem.zombiesRemaining} zombies remaining`);
+            
+            // Sync the zombie counter to ensure it matches the actual number of zombies
+            syncZombieCounter();
         }
         
         // Update the wave indicator with zombies remaining
@@ -2070,9 +2076,8 @@ function checkWaveCompletion() {
             completeWave();
         } else {
             console.log(`Wave completion check: ${zombies.length} zombies still in scene but counter is 0`);
-            // Fix the counter to match the actual number of zombies
-            waveSystem.zombiesRemaining = zombies.length;
-            updateWaveIndicator();
+            // Sync the counter to match the actual number of zombies
+            syncZombieCounter();
         }
     }
 }
@@ -2527,6 +2532,9 @@ function handleZombieDeath(zombie, index) {
     // Update the wave indicator
     updateWaveIndicator();
     
+    // Sync the zombie counter after a short delay to ensure accuracy
+    setTimeout(syncZombieCounter, 100);
+    
     // Death animation - fall over
     zombie.mesh.userData.isWalking = false;
     zombie.mesh.rotation.x = Math.PI / 2; // Fall forward
@@ -2851,6 +2859,19 @@ function initializeGameControls() {
 function animate() {
     requestAnimationFrame(animate);
     
+    // Skip animation if game is paused
+    if (gameState.isPaused) return;
+    
+    const now = Date.now();
+    const delta = now - lastFrameTime;
+    lastFrameTime = now;
+    
+    // Periodically sync the zombie counter (every 2 seconds)
+    if (now - lastZombieCounterSyncTime > 2000) {
+        syncZombieCounter();
+        lastZombieCounterSyncTime = now;
+    }
+    
     // Only render if game has started or is in game over state
     if (!gameState.isStarted && !player.isGameOver) {
         // For the start screen, we want a static background
@@ -3143,3 +3164,25 @@ function updateRadar() {
         }
     });
 }
+
+// Function to synchronize the zombie counter with the actual number of zombies
+function syncZombieCounter() {
+    // Count living zombies
+    let livingZombies = 0;
+    for (const zombie of zombies) {
+        if (zombie.mesh.userData.health > 0) {
+            livingZombies++;
+        }
+    }
+    
+    // If there's a mismatch, update the counter
+    if (waveSystem.zombiesRemaining !== livingZombies) {
+        console.log(`Syncing zombie counter: UI shows ${waveSystem.zombiesRemaining}, actual living zombies: ${livingZombies}`);
+        waveSystem.zombiesRemaining = livingZombies;
+        updateWaveIndicator();
+    }
+}
+
+// Game timing variables
+let lastFrameTime = Date.now();
+let lastZombieCounterSyncTime = Date.now(); // Track last time zombie counter was synced
