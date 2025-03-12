@@ -1777,7 +1777,8 @@ function updateAmmoDisplay() {
 
 // Function to spawn zombies for the current wave
 function spawnWaveZombies() {
-    if (waveSystem.isWaveTransition || waveSystem.zombiesRemaining <= 0) return;
+    // Only return early if we're in a wave transition or if the wave is in progress and there are no zombies remaining
+    if (waveSystem.isWaveTransition || (waveSystem.isWaveInProgress && waveSystem.zombiesRemaining <= 0)) return;
     
     // If wave is not in progress, start it
     if (!waveSystem.isWaveInProgress) {
