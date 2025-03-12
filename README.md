@@ -1,6 +1,6 @@
 # Zombie Survival Game
 
-A 3D first-person zombie survival game built with Three.js. Fight off waves of zombies and survive as long as possible!
+A first-person zombie survival game built with Three.js. Fight waves of zombies, collect weapons, and try to survive as long as possible!
 
 ## Play the Game
 
@@ -9,35 +9,32 @@ You can play the game online at: [https://petergyang.github.io/ZombieSurvival/](
 ## Game Features
 
 - First-person shooter gameplay
-- Wave-based zombie spawning system
-- Boss zombie on the final wave
-- Health system and damage indicators
-- Atmospheric fog effects
-- Zombie health bars
+- Multiple weapons: Pistol, Shotgun, Machine Gun
+- Wave-based zombie attacks with increasing difficulty
+- Boss zombie with special abilities
+- Atmospheric environment with day/night cycle
+- Health and ammo management
+- Score system
 
 ## Controls
 
-- **Mouse Movement**: Look around
-- **W, A, S, D**: Move
-- **Left Mouse Button**: Shoot
-- **ESC**: Unlock mouse pointer
+- **W, A, S, D**: Movement
+- **Mouse**: Look around
+- **Left Click**: Shoot
+- **P**: Pause game
+- **1, 2, 3**: Switch weapons
 
 ## Development
 
 This game is built using:
 - Three.js for 3D rendering
 - JavaScript for game logic
-- HTML5 and CSS for the UI
+- HTML/CSS for UI elements
 
-## Local Development
+## Recent Fixes
 
-To run the game locally:
-
-1. Clone the repository
-2. Navigate to the project directory
-3. Run a local server (e.g., `npx http-server`)
-4. Open your browser to the local server address (typically http://localhost:8000)
+- Fixed canvas reference error during boss fights
 
 ## License
 
-MIT 
+This project is licensed under the MIT License - see the LICENSE file for details. 
