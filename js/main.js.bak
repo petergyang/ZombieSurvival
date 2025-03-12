@@ -1,7 +1,10 @@
 import * as THREE from 'three';
 import { Game } from './core/Game.js';
-import { Zombie } from './entities/Zombie.js?v=29';
-import { ZOMBIE, MOVEMENT } from './config/gameConfig.js';
+import { Zombie } from './entities/Zombie.js?v=28';
+
+// Initialize timing variables
+let lastFrameTime = Date.now();
+let lastZombieCounterSyncTime = Date.now(); // Track last time zombie counter was synced
 
 // Initialize audio
 const audioSystem = {
@@ -13,46 +16,6 @@ const audioSystem = {
         this.backgroundMusic = new Audio('assets/audio/Village.mp3');
         this.backgroundMusic.loop = true;
         this.backgroundMusic.volume = 0.5; // Set volume to 50%
-    },
-    
-    // Initialize weapon sound effects
-    initWeaponSounds() {
-        // Load weapon sounds
-        this.soundEffects.pistol = new Audio('assets/audio/weapons/sound_pistol.mp3');
-        this.soundEffects.shotgun = new Audio('assets/audio/weapons/sound_shotgun.mp3');
-        this.soundEffects.machinegun = new Audio('assets/audio/weapons/sound_machinegun.mp3');
-        this.soundEffects.zombieRound = new Audio('assets/audio/weapons/sound_zombieround.mp3');
-        
-        // Set volume for weapon sounds
-        this.soundEffects.pistol.volume = 0.4;
-        this.soundEffects.shotgun.volume = 0.5;
-        this.soundEffects.machinegun.volume = 0.3;
-        this.soundEffects.zombieRound.volume = 0.6;
-    },
-    
-    // Play a weapon sound
-    playWeaponSound(weaponType) {
-        const sound = this.soundEffects[weaponType];
-        if (sound) {
-            // Check if the sound is already playing
-            if (!sound.paused && sound.currentTime > 0) {
-                // If it's playing, reset it to start
-                sound.currentTime = 0;
-            }
-            // Play the sound
-            sound.play().catch(error => {
-                console.warn(`Weapon sound playback failed: ${weaponType}`, error);
-            });
-        }
-    },
-    
-    // Play zombie round sound
-    playZombieRoundSound() {
-        if (this.soundEffects.zombieRound) {
-            this.soundEffects.zombieRound.play().catch(error => {
-                console.warn('Zombie round sound playback failed:', error);
-            });
-        }
     },
     
     // Play background music
@@ -84,7 +47,6 @@ const audioSystem = {
 // Initialize audio when the page loads
 document.addEventListener('DOMContentLoaded', () => {
     audioSystem.initBackgroundMusic();
-    audioSystem.initWeaponSounds();
 });
 
 // Add structured game state management
@@ -174,8 +136,6 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
-// Define canvas variable to reference the renderer's DOM element
-const canvas = renderer.domElement;
 
 // Create skybox with stars and moon
 function createSkybox() {
@@ -343,10 +303,11 @@ const machinegunBulletGeometry = new THREE.SphereGeometry(0.08, 8, 8);
 
 // Zombie system
 const zombies = [];
-const zombieSpawnInterval = 5000; // milliseconds between zombie spawns
+// Remove duplicate zombieSpeed constant and use ZOMBIE.SPEED from gameConfig.js
+const zombieSpawnInterval = ZOMBIE.SPAWN_INTERVAL; // Use value from gameConfig.js
 let lastZombieSpawnTime = 0;
-const maxZombies = 20; // Maximum number of zombies in the scene
-const zombieDetectionRange = 30; // How far zombies can detect the player
+const maxZombies = ZOMBIE.MAX_ZOMBIES; // Use value from gameConfig.js
+const zombieDetectionRange = ZOMBIE.DETECTION_RANGE; // Use value from gameConfig.js
 
 // Wave system
 const waveSystem = {
@@ -1559,9 +1520,6 @@ function handleShooting() {
         // Show muzzle flash
         muzzleFlashMaterial.opacity = 1;
         
-        // Play the appropriate weapon sound
-        audioSystem.playWeaponSound(player.currentWeapon);
-        
         // Create bullets based on weapon type
         if (player.currentWeapon === 'shotgun') {
             // Shotgun fires 3 bullets in a spread
@@ -1785,9 +1743,6 @@ function spawnWaveZombies() {
         waveSystem.isWaveInProgress = true;
         waveSystem.zombiesRemaining = waveSystem.zombiesPerWave[waveSystem.currentWave - 1];
         
-        // Play zombie round sound
-        audioSystem.playZombieRoundSound();
-        
         // Show wave start message
         showWaveMessage(`Wave ${waveSystem.currentWave} Started!`);
         
@@ -1894,11 +1849,11 @@ function spawnWaveZombies() {
                 let x, z;
                 let attempts = 0;
                 
-                while (!validPosition && attempts < 15) {
+                while (!validPosition && attempts < 15) { // Increased from 10 to 15 attempts
                     attempts++;
-                    // Increased spread from 5 to 15 units for better spacing
-                    const offsetX = (Math.random() - 0.5) * 15; 
-                    const offsetZ = (Math.random() - 0.5) * 15;
+                    // Use ZOMBIE.SPAWN_SPREAD for consistent spread
+                    const offsetX = (Math.random() - 0.5) * ZOMBIE.SPAWN_SPREAD; 
+                    const offsetZ = (Math.random() - 0.5) * ZOMBIE.SPAWN_SPREAD;
                     x = spawnPoint.x + offsetX;
                     z = spawnPoint.z + offsetZ;
                     
@@ -1923,8 +1878,9 @@ function spawnWaveZombies() {
                             const dz = z - existingZombie.mesh.position.z;
                             const distanceSquared = dx * dx + dz * dz;
                             
-                            // Increased minimum distance between zombies from 3 to 5 units
-                            if (distanceSquared < 25) {
+                            // Use ZOMBIE.MIN_DISTANCE for consistent minimum distance
+                            const minDistanceSquared = ZOMBIE.MIN_DISTANCE * ZOMBIE.MIN_DISTANCE;
+                            if (distanceSquared < minDistanceSquared) {
                                 validPosition = false;
                                 break;
                             }
@@ -2023,8 +1979,8 @@ function spawnWaveZombies() {
                 while (!validPosition && attempts < 15) { // Increased from 10 to 15 attempts
                     attempts++;
                     // Increased spread from 5 to 10 units for better spacing
-                    const offsetX = (Math.random() - 0.5) * 10; 
-                    const offsetZ = (Math.random() - 0.5) * 10;
+                    const offsetX = (Math.random() - 0.5) * ZOMBIE.SPAWN_SPREAD; 
+                    const offsetZ = (Math.random() - 0.5) * ZOMBIE.SPAWN_SPREAD;
                     x = spawnPoint.x + offsetX;
                     z = spawnPoint.z + offsetZ;
                     
@@ -2049,8 +2005,9 @@ function spawnWaveZombies() {
                             const dz = z - existingZombie.mesh.position.z;
                             const distanceSquared = dx * dx + dz * dz;
                             
-                            // If too close to another zombie (less than 3 units apart)
-                            if (distanceSquared < 9) {
+                            // Use ZOMBIE.MIN_DISTANCE for consistent minimum distance
+                            const minDistanceSquared = ZOMBIE.MIN_DISTANCE * ZOMBIE.MIN_DISTANCE;
+                            if (distanceSquared < minDistanceSquared) {
                                 validPosition = false;
                                 break;
                             }
@@ -2085,10 +2042,6 @@ function spawnWaveZombies() {
             // Sync the zombie counter to ensure it matches the actual number of zombies
             syncZombieCounter();
         }
-        
-        // Update the wave indicator with zombies remaining
-        updateWaveIndicator();
-        console.log(`Wave ${waveSystem.currentWave} started with ${waveSystem.zombiesRemaining} zombies remaining`);
     }
 }
 
@@ -2324,10 +2277,10 @@ function updateZombies() {
             player.position.z - zombie.mesh.position.z
         ).normalize();
         
-        // Calculate intended position using the zombie's speedMultiplier
-        const baseSpeed = ZOMBIE.SPEED;
-        const speedMultiplier = zombie.mesh.userData.speedMultiplier || 1.0; // Default to 1.0 if not set
-        const speed = baseSpeed * speedMultiplier;
+        // Calculate intended position
+        // Use the zombie's speedMultiplier from userData
+        const baseSpeed = zombie.mesh.userData.isBoss ? ZOMBIE.SPEED * 0.9 : ZOMBIE.SPEED;
+        const speed = baseSpeed * zombie.mesh.userData.speedMultiplier;
         const newX = zombie.mesh.position.x + direction.x * speed;
         const newZ = zombie.mesh.position.z + direction.z * speed;
         
@@ -2906,7 +2859,7 @@ function initializeGameControls() {
     }
 }
 
-// Define timing variables before they're used
+// Initialize timing variables
 let lastFrameTime = Date.now();
 let lastZombieCounterSyncTime = Date.now(); // Track last time zombie counter was synced
 

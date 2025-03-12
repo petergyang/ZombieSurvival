@@ -155,12 +155,15 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
+            background: linear-gradient(to bottom, #300000, #000000);
             z-index: 89;
             display: block;
         }
         .game-ui {
             display: none; /* Hide all game UI elements initially */
+        }
+        #weaponInfo {
+            display: none; /* Hide weapon info on start screen */
         }
     </style>
 </head>
@@ -177,7 +180,6 @@
             <div><span class="key">W,A,S,D</span> <span>Movement</span></div>
             <div><span class="key">Mouse</span> <span>Look around</span></div>
             <div><span class="key">Left Click</span> <span>Shoot</span></div>
-            <div><span class="key">R</span> <span>Reload</span></div>
             <div><span class="key">P</span> <span>Pause game</span></div>
         </div>
         
@@ -199,6 +201,6 @@
             }
         }
     </script>
-    <script type="module" src="js/main.js?v=24"></script>
+    <script type="module" src="js/main.js"></script>
 </body>
 </html> 

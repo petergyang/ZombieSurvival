@@ -5,8 +5,43 @@ export class Zombie {
     constructor(scene, x, z, isBoss = false) {
         this.scene = scene;
         this.isBoss = isBoss;
+        
+        // Calculate speed multiplier before creating the mesh
+        if (this.isBoss) {
+            // Boss zombies have 1.2x base speed (changed from 0.9x)
+            this.speedMultiplier = 1.2;
+        } else {
+            // Regular zombies have variable speeds:
+            // 20% chance of very fast zombie (1.5x speed)
+            // 30% chance of fast zombie (1.2x speed)
+            // 50% chance of normal/slow zombie (0.7-1.2x speed)
+            const speedRoll = Math.random();
+            if (speedRoll < 0.2) {
+                // Very fast zombie (1.5x speed)
+                this.speedMultiplier = 1.5;
+            } else if (speedRoll < 0.5) {
+                // Fast zombie (1.2x speed)
+                this.speedMultiplier = 1.2;
+            } else {
+                // Normal/slow zombie (0.7-1.2x speed)
+                this.speedMultiplier = 0.7 + Math.random() * 0.5;
+            }
+        }
+        
+        // Now create the mesh with the speed multiplier already set
         this.mesh = this.createZombieMesh(x, z);
         this.scene.add(this.mesh);
+        
+        // Apply scaling based on speed after mesh creation
+        if (!this.isBoss) {
+            if (this.speedMultiplier > 1.4) {
+                // Make very fast zombies smaller
+                this.mesh.scale.set(0.7, 0.7, 0.7);
+            } else if (this.speedMultiplier > 1.1) {
+                // Make fast zombies slightly smaller
+                this.mesh.scale.set(0.85, 0.85, 0.85);
+            }
+        }
     }
 
     createZombieMesh(x, z) {
@@ -20,7 +55,17 @@ export class Zombie {
         const randomFactor = Math.random() * 0.2 + 0.9; // 0.9 to 1.1
         
         // Base colors - using the low-poly style from the reference image
-        const skinColor = this.isBoss ? 0x8B0000 : 0x7da87b; // Dark red skin for boss, greenish for regular zombies
+        let skinColor;
+        if (this.isBoss) {
+            skinColor = 0x8B0000; // Dark red skin for boss
+        } else if (this.speedMultiplier > 2.0) {
+            skinColor = 0xb30000; // Bright red for very fast zombies
+        } else if (this.speedMultiplier > 1.5) {
+            skinColor = 0xd17a00; // Orange for fast zombies
+        } else {
+            skinColor = 0x7da87b; // Greenish for regular zombies
+        }
+        
         const hairColor = this.isBoss ? 0x222222 : (Math.random() > 0.7 ? 0x3a2e27 : (Math.random() > 0.5 ? 0x553311 : 0x222222)); // Black hair for boss
         const shirtColor = this.isBoss ? 0xCCCCCC : (Math.random() > 0.5 ? 0x8B4513 : 0x556B2F); // Light gray armor for boss
         const pantsColor = this.isBoss ? 0x999999 : (Math.random() > 0.5 ? 0x4B3621 : 0x5F5F5F); // Gray armor for boss
@@ -61,11 +106,36 @@ export class Zombie {
         head.add(rightEyeSocket);
         
         const eyeGeometry = new THREE.BoxGeometry(0.1 * scale, 0.08 * scale, 0.06 * scale);
-        const eyeMaterial = new THREE.MeshBasicMaterial({ 
-            color: this.isBoss ? 0xFF6600 : 0xffffff, // Glowing orange eyes for boss
-            emissive: this.isBoss ? 0xFF6600 : 0x000000,
-            emissiveIntensity: this.isBoss ? 1 : 0
-        });
+        
+        // Fix: Use separate materials for different zombie types without emissive properties on MeshBasicMaterial
+        let eyeMaterial;
+        if (this.isBoss) {
+            // Boss eyes - orange glow
+            eyeMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xFF6600,
+                emissive: 0xFF6600,
+                emissiveIntensity: 1
+            });
+        } else if (this.speedMultiplier > 1.4) {
+            // Very fast zombie - red eyes
+            eyeMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xFF0000,
+                emissive: 0xFF0000,
+                emissiveIntensity: 0.8
+            });
+        } else if (this.speedMultiplier > 1.1) {
+            // Fast zombie - orange eyes
+            eyeMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xFFAA00,
+                emissive: 0xFFAA00,
+                emissiveIntensity: 0.5
+            });
+        } else {
+            // Normal zombie - white eyes, no glow
+            eyeMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0xffffff
+            });
+        }
         
         const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
         leftEye.position.set(0, 0, 0.01 * scale);
@@ -549,13 +619,14 @@ export class Zombie {
             lastAnimationUpdate: Date.now(),
             type: 'zombie',
             isBoss: this.isBoss,
-            damage: this.isBoss ? ZOMBIE.BOSS.DAMAGE : ZOMBIE.REGULAR.DAMAGE
+            damage: this.isBoss ? ZOMBIE.BOSS.DAMAGE : ZOMBIE.REGULAR.DAMAGE,
+            speedMultiplier: this.speedMultiplier // Store speed multiplier in userData
         };
         
         // Add health bar
         this.addHealthBar(zombie);
         
-        // Add glowing effect for boss
+        // Add glowing effect for boss and fast zombies
         if (this.isBoss) {
             // Add a subtle glow around the boss
             const glowGeometry = new THREE.SphereGeometry(5 * scale, 16, 16);
@@ -581,6 +652,46 @@ export class Zombie {
             groundEffect.rotation.x = -Math.PI / 2; // Lay flat on ground
             groundEffect.position.y = -1.4;
             zombie.add(groundEffect);
+        } 
+        // Add glow effects for fast zombies
+        else if (this.speedMultiplier > 2.0) {
+            // Add a red glow around very fast zombies
+            const glowGeometry = new THREE.SphereGeometry(2 * scale, 16, 16);
+            const glowMaterial = new THREE.MeshBasicMaterial({
+                color: 0xFF0000,
+                transparent: true,
+                opacity: 0.08,
+                side: THREE.BackSide
+            });
+            const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+            glow.position.y = 1 * scale;
+            zombie.add(glow);
+            
+            // Add a small ground effect for very fast zombies
+            const groundEffectGeometry = new THREE.CircleGeometry(1.5 * scale, 16);
+            const groundEffectMaterial = new THREE.MeshBasicMaterial({
+                color: 0xFF0000,
+                transparent: true,
+                opacity: 0.1,
+                side: THREE.DoubleSide
+            });
+            const groundEffect = new THREE.Mesh(groundEffectGeometry, groundEffectMaterial);
+            groundEffect.rotation.x = -Math.PI / 2; // Lay flat on ground
+            groundEffect.position.y = -0.7;
+            zombie.add(groundEffect);
+        }
+        else if (this.speedMultiplier > 1.5) {
+            // Add a orange glow around fast zombies
+            const glowGeometry = new THREE.SphereGeometry(1.5 * scale, 16, 16);
+            const glowMaterial = new THREE.MeshBasicMaterial({
+                color: 0xFF6600,
+                transparent: true,
+                opacity: 0.05,
+                side: THREE.BackSide
+            });
+            const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+            glow.position.y = 1 * scale;
+            zombie.add(glow);
         }
         
         return zombie;
@@ -695,8 +806,9 @@ export class Zombie {
             player.position.z - this.mesh.position.z
         ).normalize();
         
-        // Calculate intended position
-        const speed = this.isBoss ? ZOMBIE.SPEED * 0.9 : ZOMBIE.SPEED;
+        // Calculate intended position using the zombie's speed multiplier
+        const baseSpeed = this.isBoss ? ZOMBIE.SPEED * 0.9 : ZOMBIE.SPEED;
+        const speed = baseSpeed * this.speedMultiplier;
         const newX = this.mesh.position.x + direction.x * speed;
         const newZ = this.mesh.position.z + direction.z * speed;
         
@@ -772,8 +884,9 @@ export class Zombie {
     wander(collisionBoundaries, now) {
         // Random wandering behavior
         const wanderAngle = now * 0.0005 + Math.random(); // Different for each zombie
-        const newX = this.mesh.position.x + Math.sin(wanderAngle) * ZOMBIE.SPEED * 0.3;
-        const newZ = this.mesh.position.z + Math.cos(wanderAngle) * ZOMBIE.SPEED * 0.3;
+        const wanderSpeed = ZOMBIE.SPEED * 0.3 * this.speedMultiplier;
+        const newX = this.mesh.position.x + Math.sin(wanderAngle) * wanderSpeed;
+        const newZ = this.mesh.position.z + Math.cos(wanderAngle) * wanderSpeed;
         
         // Check for collisions with buildings
         let canMove = true;
