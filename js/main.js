@@ -353,7 +353,7 @@ const waveSystem = {
     currentWave: 1,
     maxWaves: 5,
     zombiesPerWave: [12, 20, 28, 40, 1], // Quadrupled zombies per wave (was originally [3, 5, 7, 10, 1])
-    zombiesRemaining: 12, // Start with 12 zombies in wave 1 (was originally 3)
+    zombiesRemaining: 0, // Start with 0 zombies to trigger the spawn function
     isWaveInProgress: false,
     isWaveTransition: false,
     transitionTimeRemaining: 0,
