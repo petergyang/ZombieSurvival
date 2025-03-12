@@ -304,7 +304,18 @@ const player = {
     // Weapon system
     currentWeapon: 'pistol', // 'pistol', 'shotgun', or 'machinegun'
     shotgunAmmo: 0,
-    machinegunAmmo: 0
+    machinegunAmmo: 0,
+    
+    // Add takeDamage method for compatibility
+    takeDamage: function(amount) {
+        const now = Date.now();
+        if (now - this.lastDamageTime > this.damageCooldown) {
+            this.health = Math.max(0, this.health - amount);
+            this.lastDamageTime = now;
+            return true;
+        }
+        return false;
+    }
 };
 
 // Collision system for buildings
@@ -1782,6 +1793,12 @@ function spawnWaveZombies() {
     
     // If wave is not in progress, start it
     if (!waveSystem.isWaveInProgress) {
+        // Safety check to ensure we have a valid wave index
+        if (waveSystem.currentWave < 1 || waveSystem.currentWave > waveSystem.maxWaves) {
+            console.error(`Invalid wave number: ${waveSystem.currentWave}, resetting to 1`);
+            waveSystem.currentWave = 1;
+        }
+        
         console.log(`Starting wave ${waveSystem.currentWave} with ${waveSystem.zombiesPerWave[waveSystem.currentWave - 1]} zombies`);
         waveSystem.isWaveInProgress = true;
         waveSystem.zombiesRemaining = waveSystem.zombiesPerWave[waveSystem.currentWave - 1];
@@ -1791,6 +1808,9 @@ function spawnWaveZombies() {
         
         // Show wave start message
         showWaveMessage(`Wave ${waveSystem.currentWave} Started!`);
+        
+        // Hide wave message after a delay
+        setTimeout(hideWaveMessage, 3000);
         
         // For the boss wave, spawn a single boss
         if (waveSystem.currentWave === 5) {
@@ -1837,55 +1857,19 @@ function spawnWaveZombies() {
             }
             
             // Also spawn 30 normal zombies for wave 5
-            // Create spawn points around the player
-            const spawnPoints = [];
-            const numSpawnPoints = 8; // Use 8 spawn points for the normal zombies
+            // Define spawn points around the map
+            const spawnPoints = [
+                { x: -50, z: -50 }, // Southwest
+                { x: 0, z: -50 },   // South
+                { x: 50, z: -50 },  // Southeast
+                { x: -50, z: 0 },   // West
+                { x: 50, z: 0 },    // East
+                { x: -50, z: 50 },  // Northwest
+                { x: 0, z: 50 },    // North
+                { x: 50, z: 50 }    // Northeast
+            ];
             
-            // Find valid spawn points (not inside buildings)
-            for (let i = 0; i < numSpawnPoints; i++) {
-                let validPosition = false;
-                let spawnPoint;
-                let attempts = 0;
-                
-                while (!validPosition && attempts < 30) {
-                    attempts++;
-                    const angle = (i / numSpawnPoints) * Math.PI * 2 + (Math.random() * 0.5);
-                    const distance = 40 + Math.random() * 15; // 40-55 units away in the tree line
-                    const x = player.position.x + Math.cos(angle) * distance;
-                    const z = player.position.z + Math.sin(angle) * distance;
-                    
-                    // Check if position is valid (not inside a building)
-                    validPosition = true;
-                    for (const boundary of collisionBoundaries) {
-                        if (x + zombieCollisionRadius > boundary.minX && 
-                            x - zombieCollisionRadius < boundary.maxX && 
-                            z + zombieCollisionRadius > boundary.minZ && 
-                            z - zombieCollisionRadius < boundary.maxZ) {
-                            validPosition = false;
-                            break;
-                        }
-                    }
-                    
-                    if (validPosition) {
-                        spawnPoint = { x, z };
-                    }
-                }
-                
-                // If we found a valid spawn point, add it
-                if (spawnPoint) {
-                    spawnPoints.push(spawnPoint);
-                } else {
-                    // Fallback: use a point far away from buildings
-                    const angle = (i / numSpawnPoints) * Math.PI * 2;
-                    const distance = 45; // Far enough to likely avoid buildings
-                    spawnPoints.push({
-                        x: player.position.x + Math.cos(angle) * distance,
-                        z: player.position.z + Math.sin(angle) * distance
-                    });
-                }
-            }
-            
-            // Spawn 30 normal zombies
+            // Spawn 30 zombies at these points
             for (let i = 0; i < 30; i++) {
                 // Choose a random spawn point
                 const spawnPoint = spawnPoints[i % spawnPoints.length];
@@ -1937,95 +1921,49 @@ function spawnWaveZombies() {
                 if (validPosition) {
                     const zombie = new Zombie(scene, x, z, false);
                     // Add a small random delay before the zombie starts moving
-                    zombie.mesh.userData.startDelay = Math.random() * 1000; // Random delay up to 1 second
+                    zombie.mesh.userData.startDelay = Math.random() * 2000;
                     zombies.push(zombie);
                 } else {
-                    // If we couldn't find a valid position, try a completely different location
+                    // Fallback: spawn at a random position around the map perimeter
                     const angle = Math.random() * Math.PI * 2;
-                    const distance = 40 + Math.random() * 15;
-                    const fallbackX = player.position.x + Math.cos(angle) * distance;
-                    const fallbackZ = player.position.z + Math.sin(angle) * distance;
-                    
-                    const zombie = new Zombie(scene, fallbackX, fallbackZ, false);
-                    // Add a small random delay before the zombie starts moving
-                    zombie.mesh.userData.startDelay = Math.random() * 1000; // Random delay up to 1 second
+                    const distance = 50 + Math.random() * 5;
+                    x = player.position.x + Math.cos(angle) * distance;
+                    z = player.position.z + Math.sin(angle) * distance;
+                    const zombie = new Zombie(scene, x, z, false);
+                    zombie.mesh.userData.startDelay = Math.random() * 2000;
                     zombies.push(zombie);
                 }
             }
-            
-            // Update the wave indicator with the correct count of zombies
-            updateWaveIndicator();
-            console.log(`Wave ${waveSystem.currentWave} started with ${waveSystem.zombiesRemaining} zombies remaining`);
-            
-            // Sync the zombie counter to ensure it matches the actual number of zombies
-            syncZombieCounter();
         } else {
-            // For regular waves, spawn zombies in groups
+            // For normal waves, spawn zombies based on the wave number
             const zombiesToSpawn = waveSystem.zombiesPerWave[waveSystem.currentWave - 1];
             
-            // Create 4-8 spawn points around the player to handle the increased number of zombies
-            const spawnPoints = [];
-            const numSpawnPoints = Math.min(8, Math.ceil(zombiesToSpawn / 5));
+            // Define spawn points around the map
+            const spawnPoints = [
+                { x: -50, z: -50 }, // Southwest
+                { x: 0, z: -50 },   // South
+                { x: 50, z: -50 },  // Southeast
+                { x: -50, z: 0 },   // West
+                { x: 50, z: 0 },    // East
+                { x: -50, z: 50 },  // Northwest
+                { x: 0, z: 50 },    // North
+                { x: 50, z: 50 }    // Northeast
+            ];
             
-            // Find valid spawn points (not inside buildings)
-            for (let i = 0; i < numSpawnPoints; i++) {
-                let validPosition = false;
-                let spawnPoint;
-                let attempts = 0;
-                
-                while (!validPosition && attempts < 30) {
-                    attempts++;
-                    const angle = (i / numSpawnPoints) * Math.PI * 2 + (Math.random() * 0.5);
-                    const distance = 40 + Math.random() * 15; // Increased to 40-55 units away to spawn in the tree line
-                    const x = player.position.x + Math.cos(angle) * distance;
-                    const z = player.position.z + Math.sin(angle) * distance;
-                    
-                    // Check if position is valid (not inside a building)
-                    validPosition = true;
-                    for (const boundary of collisionBoundaries) {
-                        if (x + zombieCollisionRadius > boundary.minX && 
-                            x - zombieCollisionRadius < boundary.maxX && 
-                            z + zombieCollisionRadius > boundary.minZ && 
-                            z - zombieCollisionRadius < boundary.maxZ) {
-                            validPosition = false;
-                            break;
-                        }
-                    }
-                    
-                    if (validPosition) {
-                        spawnPoint = { x, z };
-                    }
-                }
-                
-                // If we found a valid spawn point, add it
-                if (spawnPoint) {
-                    spawnPoints.push(spawnPoint);
-                } else {
-                    // Fallback: use a point far away from buildings
-                    const angle = (i / numSpawnPoints) * Math.PI * 2;
-                    const distance = 45; // Far enough to likely avoid buildings
-                    spawnPoints.push({
-                        x: player.position.x + Math.cos(angle) * distance,
-                        z: player.position.z + Math.sin(angle) * distance
-                    });
-                }
-            }
-            
-            // Distribute zombies among spawn points
+            // Spawn zombies at these points
             for (let i = 0; i < zombiesToSpawn; i++) {
                 // Choose a random spawn point
                 const spawnPoint = spawnPoints[i % spawnPoints.length];
                 
-                // Add more significant randomness to position to space them out better
+                // Add some randomness to position (but keep them clustered)
                 let validPosition = false;
                 let x, z;
                 let attempts = 0;
                 
-                while (!validPosition && attempts < 15) { // Increased from 10 to 15 attempts
+                while (!validPosition && attempts < 15) {
                     attempts++;
-                    // Increased spread from 5 to 10 units for better spacing
-                    const offsetX = (Math.random() - 0.5) * 10; 
-                    const offsetZ = (Math.random() - 0.5) * 10;
+                    const offsetX = (Math.random() - 0.5) * 15;
+                    const offsetZ = (Math.random() - 0.5) * 15;
                     x = spawnPoint.x + offsetX;
                     z = spawnPoint.z + offsetZ;
                     
@@ -2050,8 +1988,7 @@ function spawnWaveZombies() {
                             const dz = z - existingZombie.mesh.position.z;
                             const distanceSquared = dx * dx + dz * dz;
                             
-                            // If too close to another zombie (less than 3 units apart)
-                            if (distanceSquared < 9) {
+                            if (distanceSquared < 25) {
                                 validPosition = false;
                                 break;
                             }
@@ -2059,37 +1996,27 @@ function spawnWaveZombies() {
                     }
                 }
                 
-                // Create zombie at valid position or at spawn point if no valid position found
+                // Create zombie at valid position or at a fallback position
                 if (validPosition) {
                     const zombie = new Zombie(scene, x, z, false);
                     // Add a small random delay before the zombie starts moving
-                    zombie.mesh.userData.startDelay = Math.random() * 1000; // Random delay up to 1 second
+                    zombie.mesh.userData.startDelay = Math.random() * 2000;
                     zombies.push(zombie);
                 } else {
-                    // If we couldn't find a valid position, try a completely different location
+                    // Fallback: spawn at a random position around the map perimeter
                     const angle = Math.random() * Math.PI * 2;
-                    const distance = 40 + Math.random() * 15;
-                    const fallbackX = player.position.x + Math.cos(angle) * distance;
-                    const fallbackZ = player.position.z + Math.sin(angle) * distance;
-                    
-                    const zombie = new Zombie(scene, fallbackX, fallbackZ, false);
-                    // Add a small random delay before the zombie starts moving
-                    zombie.mesh.userData.startDelay = Math.random() * 1000; // Random delay up to 1 second
+                    const distance = 50 + Math.random() * 5;
+                    x = player.position.x + Math.cos(angle) * distance;
+                    z = player.position.z + Math.sin(angle) * distance;
+                    const zombie = new Zombie(scene, x, z, false);
+                    zombie.mesh.userData.startDelay = Math.random() * 2000;
                     zombies.push(zombie);
                 }
             }
-            
-            // Update the wave indicator with the correct count of zombies
-            updateWaveIndicator();
-            console.log(`Wave ${waveSystem.currentWave} started with ${waveSystem.zombiesRemaining} zombies remaining`);
-            
-            // Sync the zombie counter to ensure it matches the actual number of zombies
-            syncZombieCounter();
         }
         
-        // Update the wave indicator with zombies remaining
+        // Update the wave indicator
         updateWaveIndicator();
-        console.log(`Wave ${waveSystem.currentWave} started with ${waveSystem.zombiesRemaining} zombies remaining`);
     }
 }
 
@@ -2178,9 +2105,6 @@ function completeWave() {
         spawnWaveZombies();
     }, 3000); // 3 second delay before next wave
     
-    // Update score display with the bonus points
-    updateScoreDisplay();
-    
     // Add a delayed check to ensure wave completion
     setTimeout(() => {
         // Force check for wave completion
@@ -2191,7 +2115,9 @@ function completeWave() {
 
 // Function to handle game win
 function handleGameWin() {
+    // Set game over state in both places for consistency
     player.isGameOver = true;
+    gameState.isGameOver = true;
     
     // Create win display
     const winDisplay = document.createElement('div');
@@ -2399,13 +2325,10 @@ function updateZombies() {
 
 // Function to handle zombie attacking player
 function attackPlayer(zombie) {
-    const now = Date.now();
+    // Use the player's takeDamage method
+    const damaged = player.takeDamage(zombie.mesh.userData.damage);
     
-    if (now - player.lastDamageTime > player.damageCooldown) {
-        // Apply damage to player
-        player.health -= zombie.mesh.userData.damage;
-        player.lastDamageTime = now;
-        
+    if (damaged) {
         // Show damage flash
         damageFlash();
         
@@ -2614,76 +2537,93 @@ function handleZombieDeath(zombie, index) {
 
 // Function to restart game
 function restartGame() {
-    // Clear any pending zombie removal timeouts
-    zombies.forEach(zombie => {
-        if (zombie.mesh.userData.removalTimeoutId) {
-            clearTimeout(zombie.mesh.userData.removalTimeoutId);
+    console.log("Restarting game...");
+    
+    try {
+        // Clear any pending zombie removal timeouts
+        zombies.forEach(zombie => {
+            if (zombie.mesh.userData.removalTimeoutId) {
+                clearTimeout(zombie.mesh.userData.removalTimeoutId);
+            }
+        });
+        
+        // Remove game over or win display - use a safer approach
+        const gameEndDisplay = document.querySelector('.game-menu:not(#startScreen):not(#pauseMenu)');
+        if (gameEndDisplay && gameEndDisplay.parentNode) {
+            gameEndDisplay.parentNode.removeChild(gameEndDisplay);
         }
-    });
-    
-    // Remove game over or win display
-    const gameEndDisplay = document.querySelector('div:not(#crosshair):not(.score-display):not(.health-display):not(.wave-display):not(#startScreen):not(#pauseMenu):not(#startScreenOverlay)');
-    if (gameEndDisplay) {
-        document.body.removeChild(gameEndDisplay);
+        
+        // Hide start screen overlay if visible
+        const startScreenOverlay = document.getElementById('startScreenOverlay');
+        if (startScreenOverlay) {
+            startScreenOverlay.style.display = 'none';
+        }
+        
+        // Resume background music
+        audioSystem.resumeBackgroundMusic();
+        
+        // Reset player state
+        player.health = player.maxHealth;
+        player.score = 0;
+        player.isGameOver = false;
+        player.position.set(0, playerHeight, 10); // Changed from z=5 to z=10
+        player.rotation.horizontal = 0;
+        player.rotation.vertical = 0;
+        
+        // Reset game state
+        gameState.isPaused = false;
+        gameState.isGameOver = false;
+        gameState.currentWave = 1;
+        gameState.isWaveInProgress = false;
+        gameState.isWaveTransition = false;
+        
+        // Reset wave system
+        waveSystem.currentWave = 1;
+        waveSystem.isWaveInProgress = false;
+        waveSystem.isWaveTransition = false;
+        waveSystem.zombiesRemaining = 0; // Reset zombies remaining to trigger new wave
+        updateWaveIndicator();
+        
+        // Hide wave message
+        hideWaveMessage();
+        
+        // Remove all zombies
+        for (let i = zombies.length - 1; i >= 0; i--) {
+            scene.remove(zombies[i].mesh);
+        }
+        zombies.length = 0;
+        
+        // Remove all bullets
+        for (let i = bullets.length - 1; i >= 0; i--) {
+            scene.remove(bullets[i]);
+        }
+        bullets.length = 0;
+        
+        // Update displays
+        updateHealthDisplay();
+        updateScoreDisplay();
+        
+        // Show crosshair
+        const crosshair = document.getElementById('crosshair');
+        if (crosshair) {
+            crosshair.style.display = 'block';
+        }
+        
+        // Show radar
+        radar.style.display = 'block';
+        
+        // Re-lock pointer
+        managePointerLock(true);
+        
+        // Force a new wave to start after a short delay
+        setTimeout(() => {
+            spawnWaveZombies();
+        }, 1000);
+        
+        console.log("Game restart complete");
+    } catch (error) {
+        console.error("Error in restartGame:", error);
     }
-    
-    // Hide start screen overlay if visible
-    const startScreenOverlay = document.getElementById('startScreenOverlay');
-    if (startScreenOverlay) {
-        startScreenOverlay.style.display = 'none';
-    }
-    
-    // Resume background music
-    audioSystem.resumeBackgroundMusic();
-    
-    // Reset player state
-    player.health = player.maxHealth;
-    player.score = 0;
-    player.isGameOver = false;
-    player.position.set(0, playerHeight, 10); // Changed from z=5 to z=10
-    player.rotation.horizontal = 0;
-    player.rotation.vertical = 0;
-    
-    // Reset game state
-    gameState.isPaused = false;
-    gameState.isGameOver = false;
-    gameState.currentWave = 1;
-    gameState.isWaveInProgress = false;
-    gameState.isWaveTransition = false;
-    
-    // Reset wave system
-    waveSystem.currentWave = 1;
-    waveSystem.isWaveInProgress = false;
-    waveSystem.isWaveTransition = false;
-    updateWaveIndicator();
-    
-    // Remove all zombies
-    for (let i = zombies.length - 1; i >= 0; i--) {
-        scene.remove(zombies[i].mesh);
-    }
-    zombies.length = 0;
-    
-    // Remove all bullets
-    for (let i = bullets.length - 1; i >= 0; i--) {
-        scene.remove(bullets[i]);
-    }
-    bullets.length = 0;
-    
-    // Update displays
-    updateHealthDisplay();
-    updateScoreDisplay();
-    
-    // Re-lock pointer
-    managePointerLock(true);
-    
-    // Show crosshair
-    const crosshair = document.getElementById('crosshair');
-    if (crosshair) {
-        crosshair.style.display = 'block';
-    }
-    
-    // Show radar
-    radar.style.display = 'block';
 }
 
 // Create damage flash overlay
@@ -2735,7 +2675,18 @@ function updateHealthDisplay() {
     // Check if player health is zero or below
     if (player.health <= 0) {
         player.health = 0; // Ensure health doesn't go negative
-        handleGameOver();
+        console.log("Health reached zero, triggering game over"); // Debug log
+        
+        // Update the health bar to show zero health
+        const healthPercent = 0;
+        healthBar.style.width = `${healthPercent}%`;
+        healthBar.style.backgroundColor = 'red';
+        
+        // Call handleGameOver after a short delay to ensure UI updates first
+        setTimeout(() => {
+            handleGameOver();
+        }, 50);
+        
         return;
     }
     
@@ -3020,6 +2971,16 @@ function animate() {
         }
     } else {
         // Game over state, render at normal rate
+        // Update skybox position to follow camera
+        skyboxElements.skybox.position.copy(camera.position);
+        skyboxElements.stars.position.copy(camera.position);
+        skyboxElements.moon.position.copy(camera.position);
+        
+        // Keep flashlight and player light updated
+        flashlight.position.copy(camera.position);
+        playerLight.position.copy(camera.position);
+        
+        // Render the scene
         renderer.render(scene, camera);
     }
 }
@@ -3036,61 +2997,89 @@ animate();
 
 // Function to handle game over
 function handleGameOver() {
-    // Set game over state
+    // Check if already in game over state to prevent multiple calls
+    if (player.isGameOver) return;
+    
+    // Set game over state in both places for consistency
     player.isGameOver = true;
+    gameState.isGameOver = true;
     
-    // Release pointer lock
-    managePointerLock(false);
+    console.log("Game over triggered"); // Debug log
     
-    // Pause background music
-    audioSystem.pauseBackgroundMusic();
-    
-    // Hide radar
-    radar.style.display = 'none';
-    
-    // Create game over display
-    const gameOverDisplay = document.createElement('div');
-    gameOverDisplay.className = 'game-menu';
-    gameOverDisplay.style.zIndex = '1000';
-    
-    // Add game over message
-    const gameOverTitle = document.createElement('h1');
-    gameOverTitle.textContent = 'YOU DIED';
-    gameOverTitle.className = 'game-title';
-    gameOverDisplay.appendChild(gameOverTitle);
-    
-    // Add score
-    const scoreText = document.createElement('p');
-    scoreText.textContent = `Final Score: ${player.score}`;
-    scoreText.style.fontSize = '24px';
-    scoreText.style.marginBottom = '30px';
-    gameOverDisplay.appendChild(scoreText);
-    
-    // Add wave reached
-    const waveText = document.createElement('p');
-    waveText.textContent = `Waves Survived: ${gameState.currentWave}`;
-    waveText.style.fontSize = '20px';
-    waveText.style.marginBottom = '30px';
-    gameOverDisplay.appendChild(waveText);
-    
-    // Add restart button
-    const restartButton = document.createElement('button');
-    restartButton.textContent = 'RESTART';
-    
-    // Add restart functionality
-    restartButton.onclick = function() {
-        // Remove the game over display
-        document.body.removeChild(gameOverDisplay);
+    try {
+        // Release pointer lock
+        managePointerLock(false);
         
-        // Restart the game
-        restartGame();
-    };
-    
-    gameOverDisplay.appendChild(restartButton);
-    document.body.appendChild(gameOverDisplay);
-    
-    // Play death sound if available
-    // if (soundEffects.death) soundEffects.death.play();
+        // Pause background music
+        audioSystem.pauseBackgroundMusic();
+        
+        // Hide radar
+        radar.style.display = 'none';
+        
+        // Create game over display
+        const gameOverDisplay = document.createElement('div');
+        gameOverDisplay.className = 'game-menu';
+        gameOverDisplay.style.zIndex = '1000';
+        gameOverDisplay.style.position = 'absolute';
+        gameOverDisplay.style.top = '50%';
+        gameOverDisplay.style.left = '50%';
+        gameOverDisplay.style.transform = 'translate(-50%, -50%)';
+        
+        // Add game over message
+        const gameOverTitle = document.createElement('h1');
+        gameOverTitle.textContent = 'YOU DIED';
+        gameOverTitle.className = 'game-title';
+        gameOverDisplay.appendChild(gameOverTitle);
+        
+        // Add score
+        const scoreText = document.createElement('p');
+        scoreText.textContent = `Final Score: ${player.score}`;
+        scoreText.style.fontSize = '24px';
+        scoreText.style.marginBottom = '30px';
+        gameOverDisplay.appendChild(scoreText);
+        
+        // Add wave reached
+        const waveText = document.createElement('p');
+        waveText.textContent = `Waves Survived: ${gameState.currentWave}`;
+        waveText.style.fontSize = '20px';
+        waveText.style.marginBottom = '30px';
+        gameOverDisplay.appendChild(waveText);
+        
+        // Add restart button
+        const restartButton = document.createElement('button');
+        restartButton.textContent = 'RESTART';
+        restartButton.id = 'gameOverRestartButton';
+        
+        // Add restart functionality
+        restartButton.addEventListener('click', function() {
+            console.log("Restart button clicked");
+            // Remove the game over display
+            if (gameOverDisplay.parentNode) {
+                document.body.removeChild(gameOverDisplay);
+            }
+            
+            // Restart the game
+            restartGame();
+        });
+        
+        gameOverDisplay.appendChild(restartButton);
+        
+        // Ensure the game over display is visible before adding it to the DOM
+        gameOverDisplay.style.display = 'block';
+        document.body.appendChild(gameOverDisplay);
+        
+        // Ensure the game over display is visible
+        setTimeout(() => {
+            if (gameOverDisplay.parentNode) {
+                gameOverDisplay.style.display = 'block';
+            }
+        }, 100);
+        
+        // Play death sound if available
+        // if (soundEffects.death) soundEffects.death.play();
+    } catch (error) {
+        console.error("Error in handleGameOver:", error);
+    }
 }
 
 // Function to clear collision boundaries that intersect with paths
